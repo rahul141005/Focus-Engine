@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Focus Engine">
+  <meta name="description" content="Psychologically optimized daily execution system for serious exam prep">
+  <title>Focus Engine</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<!-- ═══════ MAIN APP ═══════ -->
+<div id="app">
+  <div class="tab-content" id="tabContent">
+
+    <!-- ════════════ HOME TAB ════════════ -->
+    <div class="tab-panel active" id="tab-home">
+      <!-- Greeting (outside card) -->
+      <div class="home-greeting-outside">
+        <div class="greeting-label" id="greeting">Good morning</div>
+      </div>
+
+      <div class="home-time-card">
+      <div class="home-header">
+        <div class="greeting-block">
+          <div class="live-time" id="liveTime">--:--</div>
+          <div class="live-date" id="liveDate">Loading...</div>
+        </div>
+      </div>
+      </div><!-- end home-time-card -->
+
+      <!-- Motivational Quote (outside card) -->
+      <div class="quote-container" id="quoteContainer">
+        <div class="quote-text" id="quoteText"></div>
+      </div>
+
+      <!-- Countdown Ring (outside card) -->
+      <div class="ring-container">
+        <div class="ring-wrapper">
+          <svg class="ring-svg" viewBox="0 0 168 168">
+            <circle class="ring-track" cx="84" cy="84" r="74"/>
+            <circle class="ring-progress" id="ringProgress" cx="84" cy="84" r="74"
+              stroke-dasharray="465" stroke-dashoffset="465"/>
+          </svg>
+          <div class="ring-inner">
+            <div class="ring-label">Day ends in</div>
+            <div class="ring-value" id="ringValue">--h --m</div>
+            <div class="ring-subtext" id="ringEnd">ends at --:--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Completion Strip -->
+      <div class="completion-strip">
+        <div class="completion-bar-wrap">
+          <div class="completion-header">
+            <span class="completion-title">Today's Completion</span>
+            <span class="completion-pct" id="completionPct">0%</span>
+          </div>
+          <div class="completion-bar">
+            <div class="completion-fill" id="completionFill" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="completion-stat" id="completionStat">0 / 0 tasks</div>
+      </div>
+
+      <!-- Subject cards -->
+      <div class="section-header">
+        <div class="section-title">Today's Targets</div>
+        <div class="section-action" id="todayDayLabel">—</div>
+      </div>
+
+      <div class="subjects-list" id="subjectList">
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+          </div>
+          <div class="empty-title">No tasks for today</div>
+          <div class="empty-sub">Head to Plan tab to set up today's study targets.</div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="cta-wrap">
+        <button class="btn-primary" id="btnStartSession">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polygon points="5,3 19,12 5,21"/>
+          </svg>
+          Start Focus Session
+        </button>
+      </div>
+    </div>
+
+    <!-- ════════════ PLAN TAB ════════════ -->
+    <div class="tab-panel" id="tab-plan">
+      <div class="plan-header">
+        <div class="plan-title">Study Plan</div>
+        <button class="btn-add" id="btnAddDay" title="Add study day">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- CSV Import strip -->
+      <div class="import-strip">
+        <div class="import-text">
+          <div class="import-title">Import Study Plan</div>
+          <div class="import-sub">Upload a CSV file with your schedule</div>
+        </div>
+        <button class="btn-import" id="btnImportCSV">Import CSV</button>
+        <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none">
+      </div>
+
+      <div class="days-list" id="daysList">
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+            </svg>
+          </div>
+          <div class="empty-title">Plan is empty</div>
+          <div class="empty-sub">Add study days or import a CSV plan to get started.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ BACKLOG TAB ════════════ -->
+    <div class="tab-panel" id="tab-backlog">
+      <div class="backlog-header">
+        <div class="backlog-title">Pending Units</div>
+        <div class="backlog-sub">Tasks from previous days waiting to be absorbed into your flow.</div>
+      </div>
+
+      <div class="backlog-stats" id="backlogStats">
+        <div class="stat-chip">
+          <div class="stat-chip-value" id="backlogCount">0</div>
+          <div class="stat-chip-label">Pending</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-value" id="backlogMins">0</div>
+          <div class="stat-chip-label">Minutes</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-chip-value" id="backlogDays">0</div>
+          <div class="stat-chip-label">Days old</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Pending Units</div>
+      </div>
+
+      <div class="pending-list" id="pendingList">
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <div class="empty-title">All clear</div>
+          <div class="empty-sub">No pending units. Your flow is uninterrupted.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ PROGRESS TAB ════════════ -->
+    <div class="tab-panel" id="tab-progress">
+      <div class="progress-header">
+        <div class="progress-title">Progress</div>
+        <div class="progress-date-range" id="progressRange">Last 7 days</div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-card accent-indigo">
+          <div class="metric-label">Consistency</div>
+          <div class="metric-value" id="metricConsistency">0%</div>
+          <div class="metric-sub" id="metricConsistencySub">0 of 7 days</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Total Focus</div>
+          <div class="metric-value" id="metricTotal">0h</div>
+          <div class="metric-sub" id="metricTotalSub">this week</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Sessions</div>
+          <div class="metric-value" id="metricSessions">0</div>
+          <div class="metric-sub">completed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Daily Avg</div>
+          <div class="metric-value" id="metricAvg">0m</div>
+          <div class="metric-sub">focus time</div>
+        </div>
+      </div>
+
+      <!-- Weekly bar chart -->
+      <div class="consistency-row" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin:0 16px 16px;">
+        <div class="consistency-title">Daily Focus Time (mins)</div>
+        <div class="week-dots" id="weekBars"></div>
+      </div>
+
+      <!-- Subject distribution -->
+      <div class="subject-dist">
+        <div class="dist-title">Subject Distribution</div>
+        <div id="subjectDist">
+          <div style="font-size:13px;color:var(--text-3);text-align:center;padding:10px 0">No sessions yet</div>
+        </div>
+      </div>
+
+      <!-- Subject Analytics -->
+      <div class="section-header" style="padding-top:4px;">
+        <div class="section-title">Subject Analytics</div>
+      </div>
+      <div id="subjectAnalytics" style="padding:0 16px 16px;">
+        <div style="font-size:13px;color:var(--text-3);text-align:center;padding:10px 0">No per-question data yet</div>
+      </div>
+
+      <!-- Encouragement card -->
+      <div class="encourage-card">
+        <div class="encourage-text" id="encourageText">
+          "Every expert was once a beginner. Every pro was once an amateur."
+        </div>
+      </div>
+
+      <div style="height:8px"></div>
+    </div>
+
+    <!-- ════════════ PERSONAL TAB ════════════ -->
+    <div class="tab-panel" id="tab-personal">
+      <div class="personal-header">
+        <div class="personal-title">Personal Tasks</div>
+        <div class="personal-sub">Quick notes & to-dos (separate from study tracking)</div>
+      </div>
+
+      <div class="personal-stats" id="personalStats">
+        <div class="personal-stat-chip">
+          <div class="personal-stat-value" id="personalTotal">0</div>
+          <div class="personal-stat-label">Total</div>
+        </div>
+        <div class="personal-stat-chip">
+          <div class="personal-stat-value" id="personalPending">0</div>
+          <div class="personal-stat-label">Pending</div>
+        </div>
+        <div class="personal-stat-chip">
+          <div class="personal-stat-value" id="personalDone">0</div>
+          <div class="personal-stat-label">Done</div>
+        </div>
+      </div>
+
+      <div class="personal-add-box">
+        <input type="text" class="personal-input" id="personalInput" placeholder="Add personal task..." maxlength="200">
+        <button class="btn-personal-add" id="btnAddPersonal">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="personal-options-row">
+        <div class="personal-option-group">
+          <label class="personal-option-label">Frequency</label>
+          <div class="personal-chips" id="personalFrequencyChips">
+            <button class="personal-chip active" data-frequency="once">One Time</button>
+            <button class="personal-chip" data-frequency="daily">Daily</button>
+            <button class="personal-chip" data-frequency="weekly">Weekly</button>
+          </div>
+        </div>
+        <div class="personal-option-group">
+          <label class="personal-option-label">Priority</label>
+          <div class="personal-chips" id="personalPriorityChips">
+            <button class="personal-chip active" data-priority="none">None</button>
+            <button class="personal-chip" data-priority="low">Low</button>
+            <button class="personal-chip" data-priority="medium">Med</button>
+            <button class="personal-chip" data-priority="high">High</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="personal-list" id="personalList">
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+          </div>
+          <div class="empty-title">No personal tasks</div>
+          <div class="empty-sub">Add quick notes and to-dos here.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ SETTINGS TAB ════════════ -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="settings-header">
+        <div class="settings-title">Settings</div>
+      </div>
+
+      <!-- User Profile -->
+      <div class="settings-group">
+        <div class="settings-group-label">Profile</div>
+        <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Your Name</div>
+            <div class="setting-desc">Used for personalized greetings</div>
+          </div>
+          <input class="form-input" id="settingUserName" placeholder="Enter your name" maxlength="40" style="margin:0">
+        </div>
+      </div>
+
+      <!-- Day Config -->
+      <div class="settings-group">
+        <div class="settings-group-label">Day Configuration</div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Day End Time</div>
+            <div class="setting-desc">When your study day closes</div>
+          </div>
+          <input type="time" class="time-input" id="settingEndTime" value="23:00">
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Day Start Time</div>
+            <div class="setting-desc">When your day begins</div>
+          </div>
+          <input type="time" class="time-input" id="settingStartTime" value="06:00">
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="settings-group">
+        <div class="settings-group-label">Notifications</div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Study Notifications</div>
+            <div class="setting-desc">Daily activation & inactivity reminders</div>
+          </div>
+          <div class="toggle" id="toggleStudyNotif" onclick="App.toggleSetting(this)"></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Brain Fog Nudges</div>
+            <div class="setting-desc">Cognitive clarity reminders</div>
+          </div>
+          <div class="toggle" id="toggleBrainFog" onclick="App.toggleSetting(this)"></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Evening Reminders</div>
+            <div class="setting-desc">End-of-day closure nudges</div>
+          </div>
+          <div class="toggle" id="toggleEvening" onclick="App.toggleSetting(this)"></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Personal Task Notifications</div>
+            <div class="setting-desc">Reminders for personal tasks</div>
+          </div>
+          <div class="toggle" id="togglePersonalNotif" onclick="App.toggleSetting(this)"></div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Session Sound</div>
+            <div class="setting-desc">Soft tone on session end</div>
+          </div>
+          <div class="toggle on" id="toggleSound" onclick="App.toggleSetting(this)"></div>
+        </div>
+      </div>
+
+      <!-- Theme -->
+      <div class="settings-group">
+        <div class="settings-group-label">Appearance</div>
+        <div style="padding:8px 0 4px;">
+          <div class="theme-chips">
+            <button class="theme-chip active" data-theme="focus" onclick="App.setTheme('focus',this)">Focus</button>
+            <button class="theme-chip" data-theme="calm" onclick="App.setTheme('calm',this)">Calm</button>
+            <button class="theme-chip" data-theme="deep" onclick="App.setTheme('deep',this)">Deep</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- App -->
+      <div class="settings-group">
+        <div class="settings-group-label">App</div>
+        <div class="setting-row">
+          <div class="setting-label-wrap">
+            <div class="setting-label">Clear Local Data</div>
+            <div class="setting-desc">Reset all sessions and tasks</div>
+          </div>
+          <button class="btn-secondary" style="height:36px;padding:0 14px;font-size:12px;color:var(--rose)" id="btnClearData">Clear</button>
+        </div>
+      </div>
+
+      <!-- Supabase Status -->
+      <div class="settings-group">
+        <div class="settings-group-label">Cloud Sync (Supabase)</div>
+        <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:10px;">
+          <div class="supabase-status" id="supabaseStatus"></div>
+        </div>
+      </div>
+
+      <div style="height:16px"></div>
+    </div>
+
+  </div><!-- end tabContent -->
+
+  <!-- ════════════ BOTTOM NAV ════════════ -->
+  <nav class="nav-bar">
+    <button class="nav-item active" data-tab="home" onclick="App.switchTab('home',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-item" data-tab="plan" onclick="App.switchTab('plan',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+      <span class="nav-label">Plan</span>
+    </button>
+    <button class="nav-item" data-tab="backlog" onclick="App.switchTab('backlog',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <span class="nav-label">Backlog</span>
+    </button>
+    <button class="nav-item" data-tab="progress" onclick="App.switchTab('progress',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+      <span class="nav-label">Progress</span>
+    </button>
+    <button class="nav-item" data-tab="personal" onclick="App.switchTab('personal',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="nav-label">Personal</span>
+    </button>
+    <button class="nav-item" data-tab="settings" onclick="App.switchTab('settings',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="nav-label">Settings</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ═══ FOCUS SESSION OVERLAY ═══ -->
+<div class="session-overlay" id="sessionOverlay">
+  <div class="session-bg"></div>
+  <div class="session-gradient"></div>
+
+  <div class="session-top">
+    <div class="session-label">Focus Session</div>
+    <div class="session-subject" id="sessionSubject">—</div>
+    <div class="session-topic" id="sessionTopic">—</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+    <div class="session-timer" id="sessionTimer">00:00</div>
+    <div class="session-status" id="sessionStatus">RUNNING</div>
+  </div>
+
+  <div class="session-bottom">
+    <div class="session-controls">
+      <button class="btn-session-end" id="btnEndSession">End Session</button>
+      <button class="btn-session-pause" id="btnPauseSession">Pause</button>
+    </div>
+
+    <!-- Per-question controls (hidden by default) -->
+    <div class="per-question-panel" id="perQuestionPanel" style="display:none;width:100%;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div style="font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;">Question <span id="questionNumber">1</span></div>
+        <div style="font-family:var(--font-mono);font-size:18px;font-weight:500;color:var(--indigo);" id="questionTimer">00:00</div>
+      </div>
+      <div class="session-controls">
+        <button class="btn-session-end" id="btnSkipQuestion" style="font-size:13px;">Skip</button>
+        <button class="btn-session-pause" id="btnNextQuestion" style="font-size:13px;">Next Question</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SESSION SUMMARY OVERLAY ═══ -->
+<div class="session-summary-overlay" id="sessionSummaryOverlay">
+  <div class="summary-title" id="summaryTitle">Session Complete</div>
+  <div class="summary-stats" id="summaryStats"></div>
+  <div id="summaryDetails"></div>
+  <div style="padding:20px 0;">
+    <button class="btn-primary" onclick="App.closeSummary()">Done</button>
+  </div>
+</div>
+
+<!-- ═══ SHEET BACKDROP ═══ -->
+<div class="sheet-backdrop" id="sheetBackdrop" onclick="App.closeSheet()"></div>
+
+<!-- ═══ ADD DAY SHEET ═══ -->
+<div class="bottom-sheet" id="sheetAddDay">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Study Day</div>
+  <div class="form-group">
+    <label class="form-label">Day Label</label>
+    <input class="form-input" id="inputDayLabel" placeholder="e.g., Day 1, Travel Day, Revision" maxlength="40">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Date (optional)</label>
+    <input class="form-input" id="inputDayDate" type="date">
+  </div>
+  <div class="sheet-actions">
+    <button class="btn-secondary" style="flex:1" onclick="App.closeSheet()">Cancel</button>
+    <button class="btn-primary" style="flex:2" onclick="App.saveDay()">Add Day</button>
+  </div>
+</div>
+
+<!-- ═══ ADD TASK SHEET ═══ -->
+<div class="bottom-sheet" id="sheetAddTask">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Task</div>
+  <div class="form-group">
+    <label class="form-label">Subject</label>
+    <div class="subject-select" id="subjectSelect">
+      <button class="subj-chip" data-subj="Quant" onclick="App.selectSubject(this)">Quant</button>
+      <button class="subj-chip" data-subj="LR" onclick="App.selectSubject(this)">LR</button>
+      <button class="subj-chip" data-subj="AR" onclick="App.selectSubject(this)">AR</button>
+      <button class="subj-chip" data-subj="VA" onclick="App.selectSubject(this)">VA</button>
+      <button class="subj-chip" data-subj="Practice" onclick="App.selectSubject(this)">Practice</button>
+      <button class="subj-chip" data-subj="Other" onclick="App.selectSubject(this)">Other</button>
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Topic</label>
+    <input class="form-input" id="inputTaskTopic" placeholder="e.g., Ratio & Proportion">
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label class="form-label">Est. Minutes</label>
+      <input class="form-input" id="inputTaskMins" type="number" placeholder="45" min="1" max="600">
+    </div>
+  </div>
+  <div class="sheet-actions">
+    <button class="btn-secondary" style="flex:1" onclick="App.closeSheet()">Cancel</button>
+    <button class="btn-primary" style="flex:2" onclick="App.saveTask()">Add Task</button>
+  </div>
+</div>
+
+<!-- ═══ SESSION PICKER SHEET ═══ -->
+<div class="bottom-sheet" id="sheetSessionPicker">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Choose Task to Focus On</div>
+  <div class="session-subject-list" id="sessionSubjectList"></div>
+  <div style="padding:16px 16px 0;">
+    <button class="btn-secondary" style="width:100%" onclick="App.closeSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══ SESSION MODE SHEET ═══ -->
+<div class="bottom-sheet" id="sheetSessionMode">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Choose Session Mode</div>
+  <div style="padding:0 16px;display:flex;flex-direction:column;gap:8px;">
+    <div class="session-pick-item" onclick="App.startSessionWithMode('full')">
+      <div class="pick-dot" style="background:var(--indigo)"></div>
+      <div class="pick-info">
+        <div class="pick-subj" style="color:var(--indigo)">Full Session</div>
+        <div class="pick-topic">Track total time for the session</div>
+      </div>
+    </div>
+    <div class="session-pick-item" onclick="App.startSessionWithMode('perQuestion')">
+      <div class="pick-dot" style="background:var(--amber)"></div>
+      <div class="pick-info">
+        <div class="pick-subj" style="color:var(--amber)">Time Each Question</div>
+        <div class="pick-topic">Track time per individual question</div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:16px 16px 0;">
+    <button class="btn-secondary" style="width:100%" onclick="App.closeSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══ REASSIGN SHEET ═══ -->
+<div class="bottom-sheet" id="sheetReassign">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Move to Day</div>
+  <div id="reassignDayList" style="padding:0 16px;max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+  <div style="padding:16px 16px 0;">
+    <button class="btn-secondary" style="width:100%" onclick="App.closeSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══ CSV IMPORT SELECTION SHEET ═══ -->
+<div class="bottom-sheet csv-import-sheet" id="sheetCSVImport">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Import Study Plan</div>
+  <div class="csv-import-controls" style="padding:0 20px 12px;display:flex;gap:8px;">
+    <button class="btn-secondary" style="flex:1;height:36px;font-size:12px;" id="csvSelectAll">Select All</button>
+    <button class="btn-secondary" style="flex:1;height:36px;font-size:12px;" id="csvDeselectAll">Deselect All</button>
+  </div>
+  <div class="csv-import-list" id="csvImportList" style="padding:0 16px;max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;"></div>
+  <div class="sheet-actions" style="padding:16px 20px 0;">
+    <button class="btn-secondary" style="flex:1" onclick="App.closeSheet()">Cancel</button>
+    <button class="btn-primary" style="flex:2" id="csvImportConfirm">Import Selected</button>
+  </div>
+</div>
+
+<!-- ═══ CSV PROCESSING INDICATOR ═══ -->
+<div id="csvProcessing" class="processing-overlay">
+  <div class="spinner"></div>
+  <div class="processing-text" id="csvStatus">Parsing CSV…</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PAPAPARSE — CSV Parsing
+═══════════════════════════════════════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN APPLICATION SCRIPT
+═══════════════════════════════════════════════ -->
+<script src="app.js"></script>
+
+</body>
+</html>

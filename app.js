@@ -1,0 +1,2388 @@
+// ═══════════════════════════════════════════════════════════════════════
+//  FOCUS ENGINE — Application Logic
+//  Complete refactored JavaScript with all functionality
+// ═══════════════════════════════════════════════════════════════════════
+
+const App = (() => {
+
+  // ─── Constants ─────────────────────────────────────────────────────────
+  
+  const SUBJECT_COLORS = {
+    'Quant':    '#6366f1',
+    'LR':       '#f59e0b',
+    'AR':       '#10b981',
+    'VA':       '#ec4899',
+    'Practice': '#8b5cf6',
+    'Other':    '#6b7294',
+  };
+
+  const SUPABASE_URL = 'https://vfgcmesgcfbmokmaseht.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_rxg1Jo-WFkLJt21207wv3w_04eGdsGZ';
+  const VAPID_PUBLIC_KEY = 'BEy_F1htue07CuKuuZ9W_ona_4Jwer5MzMzBovAzYosHkzoWR4hKEPF3fuAHUCUgAGjgIq0dFgei9AqC_JqIuFI'; 
+
+  const QUOTES = [
+    "Start small. Momentum beats motivation.",
+    "Clarity follows action, not overthinking.",
+    "Fog is temporary. Motion clears it.",
+    "Consistency compounds silently.",
+    "Start before your mind negotiates.",
+    "Even a 10-minute session keeps the day alive.",
+    "Progress, not perfection — that's the standard.",
+    "The work doesn't care how you feel. Do it anyway.",
+    "Small progress rebuilds sharpness.",
+    "One task at a time. That's how mountains move.",
+    "Your effort today is tomorrow's advantage.",
+    "A focused hour is worth more than a distracted day.",
+    "Resume gently. No pressure.",
+    "Finish strong. Even partial completion counts.",
+    "Every expert was once a beginner.",
+    "Consistent effort, compounding results.",
+    "Motion before emotion. Action before clarity.",
+    "The hardest part is starting. You're already close.",
+    "Day winding down — every completed task counts.",
+    "Steady progress — the surest path forward.",
+    "Your future self thanks you for today's effort.",
+    "Discipline weighs ounces. Regret weighs tons.",
+    "You don't need motivation. You need momentum.",
+    "Small decisions compound into massive results.",
+    "The path appears by walking it.",
+    "Results come from repetition, not intensity.",
+    "Trust the process. Trust your effort.",
+    "Every session is a vote for who you're becoming.",
+    "Action is the foundational key to all success.",
+    "Start where you are. Use what you have.",
+    "Excellence is not a destination. It's a habit.",
+    "Your only limit is consistency.",
+    "The best time was yesterday. The next best is now.",
+    "Slow progress is still progress.",
+    "Don't wait for perfect conditions. Start imperfect.",
+    "Compound interest applies to knowledge too.",
+    "Every pro was once an amateur who didn't quit.",
+    "The secret is there is no secret. Just work.",
+    "Clarity comes from engagement, not thought.",
+    "Your brain will thank you for pushing through fog.",
+    "Momentum restores clarity faster than thinking.",
+    "The doing is the understanding.",
+    "Execution beats strategy every time.",
+    "Today's discomfort is tomorrow's strength.",
+    "You're one session away from a better day.",
+    "The cave you fear to enter holds the treasure.",
+    "Mastery is repetition plus reflection.",
+    "Your current self is temporary. Keep building.",
+    "Results lag behind effort. Trust the lag.",
+    "The only bad session is the one you skipped.",
+  ];
+
+  const NOTIFICATION_MESSAGES = {
+    dailyActivation: [
+      "Start small. Momentum restores clarity.",
+      "Your targets are waiting. One focused sprint is enough.",
+      "Consistency compounds silently.",
+      "A fresh day. A fresh start. Begin now.",
+    ],
+    inactivity: [
+      "Even a 10-minute session keeps the day alive.",
+      "Resume gently. No pressure.",
+      "Pick up where you left off — it's never too late.",
+      "The hardest part is starting. You're already close.",
+    ],
+    brainFog: [
+      "Fog is temporary. Motion clears it.",
+      "Start before your mind negotiates.",
+      "Small progress rebuilds sharpness.",
+      "Clarity follows action, not overthinking.",
+    ],
+    evening: [
+      "Day closing soon. One final sprint can still win today.",
+      "Finish strong. Even partial completion counts.",
+      "Review what you covered today — reinforcement matters.",
+      "Day winding down — every completed task counts.",
+    ],
+    personal: [
+      "Quick check — anything you want to wrap up?",
+      "You logged pending personal tasks today.",
+    ],
+  };
+
+  // ─── State ─────────────────────────────────────────────────────────────
+  
+  let state = {
+    days: [],
+    tasks: [],
+    sessions: [],
+    personalTasks: [],
+    questionAnalytics: [],
+    settings: {
+      dayEndTime: '23:00',
+      dayStartTime: '06:00',
+      userName: '',
+      notifications: {
+        study: false,
+        brainFog: false,
+        evening: false,
+        personal: false,
+      },
+      sound: true,
+      theme: 'focus',
+      supabase: null,
+    },
+    currentDayId: null,
+    reassignTaskId: null,
+    selectedSubject: null,
+    pushSubscription: null,
+  };
+
+  let session = {
+    active: false,
+    paused: false,
+    taskId: null,
+    subject: '',
+    topic: '',
+    startTime: null,
+    pausedAt: null,
+    elapsed: 0,
+    timerRef: null,
+    mode: 'full',
+    questions: [],
+    currentQuestionStart: null,
+    questionElapsed: 0,
+  };
+
+  let deferredInstallPrompt = null;
+  let clockRef = null;
+  let csvParsedData = null;
+  let csvSelection = {};  // track selection state: { dayKey: { selected: bool, tasks: [bool,...], date: string } }
+
+  // ─── LocalStorage ──────────────────────────────────────────────────────
+  
+  const DB = {
+    save() {
+      localStorage.setItem('fe_state', JSON.stringify({
+        days: state.days,
+        tasks: state.tasks,
+        sessions: state.sessions,
+        personalTasks: state.personalTasks,
+        questionAnalytics: state.questionAnalytics,
+        settings: state.settings,
+        pushSubscription: state.pushSubscription,
+      }));
+    },
+    load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('fe_state') || '{}');
+        if (saved.days) state.days = saved.days;
+        if (saved.tasks) state.tasks = saved.tasks;
+        if (saved.sessions) state.sessions = saved.sessions;
+        if (saved.personalTasks) state.personalTasks = saved.personalTasks;
+        if (saved.questionAnalytics) state.questionAnalytics = saved.questionAnalytics;
+        if (saved.settings) state.settings = Object.assign(state.settings, saved.settings);
+        if (saved.pushSubscription) state.pushSubscription = saved.pushSubscription;
+      } catch(e) {
+        console.warn('DB load failed', e);
+      }
+    }
+  };
+
+  // ─── Supabase Integration (FIXED: Structured Results) ─────────────────
+  
+  const Supa = {
+    client: null,
+    
+    async init(url, key) {
+      if (!url || !key) return { success: false, error: 'Missing credentials' };
+      try {
+        const { createClient } = await import(`https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm`);
+        Supa.client = createClient(url, key);
+        return { success: true };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    _mergeById(local, remote) {
+      const localMap = new Map(local.map(item => [item.id, item]));
+      const merged = [...local];
+      const remoteOnly = [];
+      for (const item of remote) {
+        if (!localMap.has(item.id)) {
+          merged.push(item);
+          remoteOnly.push(item);
+        }
+      }
+      return { merged, remoteOnly };
+    },
+
+    async _pushLocalOnly(table, local, remote) {
+      if (!Supa.client) return;
+      const remoteIds = new Set(remote.map(item => item.id));
+      for (const item of local) {
+        if (!remoteIds.has(item.id)) {
+          try {
+            await Supa.client.from(table).upsert(item, { onConflict: 'id' });
+          } catch(e) { console.warn('[Supa] push failed:', table, item.id, e.message); }
+        }
+      }
+    },
+
+    async syncDays() {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('study_days')
+          .select('*')
+          .order('created_at');
+        
+        if (error) throw error;
+        
+        const remote = data || [];
+        const { merged } = Supa._mergeById(state.days, remote);
+        state.days = merged;
+        DB.save();
+        await Supa._pushLocalOnly('study_days', state.days, remote);
+        return { success: true, data: merged, count: merged.length };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async syncTasks() {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('study_tasks')
+          .select('*')
+          .order('created_at');
+        
+        if (error) throw error;
+        
+        const remote = data || [];
+        const { merged } = Supa._mergeById(state.tasks, remote);
+        state.tasks = merged;
+        DB.save();
+        await Supa._pushLocalOnly('study_tasks', state.tasks, remote);
+        return { success: true, data: merged, count: merged.length };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async syncSessions() {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('focus_sessions')
+          .select('*')
+          .order('created_at');
+        
+        if (error) throw error;
+        
+        const remote = data || [];
+        const { merged } = Supa._mergeById(state.sessions, remote);
+        state.sessions = merged;
+        DB.save();
+        await Supa._pushLocalOnly('focus_sessions', state.sessions, remote);
+        return { success: true, data: merged, count: merged.length };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async syncPersonalTasks() {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('personal_tasks')
+          .select('*')
+          .order('created_at');
+        
+        if (error) throw error;
+        
+        const remote = data || [];
+        const { merged } = Supa._mergeById(state.personalTasks, remote);
+        state.personalTasks = merged;
+        DB.save();
+        await Supa._pushLocalOnly('personal_tasks', state.personalTasks, remote);
+        return { success: true, data: merged, count: merged.length };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async syncQuestionAnalytics() {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('question_analytics')
+          .select('*')
+          .order('created_at');
+        
+        if (error) throw error;
+        
+        const remote = data || [];
+        const { merged } = Supa._mergeById(state.questionAnalytics, remote);
+        state.questionAnalytics = merged;
+        DB.save();
+        await Supa._pushLocalOnly('question_analytics', state.questionAnalytics, remote);
+        return { success: true, data: merged, count: merged.length };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async insertDay(day) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('study_days')
+          .insert(day)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async insertTask(task) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('study_tasks')
+          .insert(task)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async updateTask(id, updates) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('study_tasks')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async updateDay(id, updates) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('study_days')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async deleteTask(id) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { error } = await Supa.client
+          .from('study_tasks')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        return { success: true };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async deleteDay(id) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { error } = await Supa.client
+          .from('study_days')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        return { success: true };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async insertSession(s) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('focus_sessions')
+          .insert(s)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async insertPersonalTask(task) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('personal_tasks')
+          .insert(task)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async updatePersonalTask(id, updates) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { data, error } = await Supa.client
+          .from('personal_tasks')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async deletePersonalTask(id) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const { error } = await Supa.client
+          .from('personal_tasks')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        return { success: true };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+    
+    async savePushSubscription(subscription) {
+      if (!Supa.client) return { success: false, error: 'Not connected' };
+      try {
+        const subJson = subscription.toJSON();
+        const { endpoint, keys } = subJson;
+        
+        const { data, error } = await Supa.client
+          .from('push_subscriptions')
+          .upsert({
+            endpoint,
+            p256dh: keys.p256dh,
+            auth: keys.auth,
+            user_id: 'anonymous',
+          }, {
+            onConflict: 'endpoint'
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return { success: true, data };
+      } catch(err) {
+        return { success: false, error: err.message };
+      }
+    },
+  };
+
+  // ─── Utilities ─────────────────────────────────────────────────────────
+  
+  function uid() {
+    return crypto.randomUUID ? crypto.randomUUID() : 
+      Math.random().toString(36).slice(2) + Date.now();
+  }
+
+  // FIXED: Pure local date string
+  function todayStr() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function parseLocalDate(dateStr) {
+    if (!dateStr) return new Date();
+    return new Date(dateStr + 'T00:00:00');
+  }
+
+  function fmtTime(secs) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function fmtMins(m) {
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m/60), rem = m%60;
+    return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function toast(msg, type='') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    el.appendChild(span);
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => { 
+      el.style.opacity='0'; 
+      el.style.transform='translateY(-8px)'; 
+      el.style.transition='all 0.3s ease'; 
+      setTimeout(()=>el.remove(), 300); 
+    }, 2800);
+  }
+
+  function openSheet(id) {
+    document.getElementById('sheetBackdrop').classList.add('active');
+    document.getElementById(id).classList.add('active');
+  }
+
+  function closeSheet() {
+    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('active'));
+    document.getElementById('sheetBackdrop').classList.remove('active');
+    state.currentDayId = null;
+    state.reassignTaskId = null;
+  }
+
+  // ─── Tab Switching ─────────────────────────────────────────────────────
+  
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById(`tab-${name}`).classList.add('active');
+    if (btn) btn.classList.add('active');
+    
+    if (name === 'home')     renderHome();
+    if (name === 'plan')     renderPlan();
+    if (name === 'backlog')  renderBacklog();
+    if (name === 'progress') renderProgress();
+    if (name === 'personal') renderPersonal();
+    if (name === 'settings') renderSettings();
+    
+    document.getElementById('tabContent').scrollTop = 0;
+  }
+
+  // ─── Clock & Ring ──────────────────────────────────────────────────────
+  
+  function startClock() {
+    updateClock();
+    clearInterval(clockRef);
+    clockRef = setInterval(updateClock, 1000);
+  }
+
+  function updateClock() {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+
+    document.getElementById('liveTime').textContent =
+      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+    document.getElementById('liveDate').textContent =
+      now.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
+
+    const name = state.settings.userName;
+    const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('greeting').textContent = name ? `${g}, ${name}` : g;
+
+    const [eh, em] = (state.settings.dayEndTime || '23:00').split(':').map(Number);
+    const [sh, sm] = (state.settings.dayStartTime || '06:00').split(':').map(Number);
+    const endSecs   = eh * 3600 + em * 60;
+    const startSecs = sh * 3600 + sm * 60;
+    const nowSecs   = h * 3600 + m * 60 + now.getSeconds();
+
+    let remaining = endSecs - nowSecs;
+    if (remaining < 0) remaining = 0;
+
+    const totalDay = endSecs - startSecs;
+    const progress = Math.max(0, Math.min(1, 1 - remaining / totalDay));
+
+    const circumference = 2 * Math.PI * 74;
+    const ring = document.getElementById('ringProgress');
+    ring.setAttribute('stroke-dasharray', circumference);
+    ring.setAttribute('stroke-dashoffset', circumference * (1 - progress));
+
+    const hue = Math.round(240 - progress * 160);
+    ring.style.stroke = `hsl(${hue}, 80%, 65%)`;
+
+    const remH = Math.floor(remaining / 3600);
+    const remM = Math.floor((remaining % 3600) / 60);
+    document.getElementById('ringValue').textContent = `${remH}h ${remM}m`;
+    document.getElementById('ringEnd').textContent = `ends at ${state.settings.dayEndTime}`;
+  }
+
+  // ─── Motivational Quote Engine ─────────────────────────────────────────
+  
+  function loadRandomQuote() {
+    const quote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    document.getElementById('quoteText').textContent = quote;
+  }
+
+  // ─── Home Rendering ────────────────────────────────────────────────────
+  
+  function renderHome() {
+    const today = todayStr();
+    const todayDay = state.days.find(d => d.date === today);
+    const label = todayDay ? todayDay.label : 'No plan for today';
+    document.getElementById('todayDayLabel').textContent = label;
+
+    const todayTasks = todayDay
+      ? state.tasks.filter(t => t.day_id === todayDay.id)
+      : [];
+
+    const total = todayTasks.length;
+    const done  = todayTasks.filter(t => t.status === 'completed').length;
+    const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    document.getElementById('completionPct').textContent  = `${pct}%`;
+    document.getElementById('completionFill').style.width = `${pct}%`;
+    document.getElementById('completionStat').textContent = `${done} / ${total} tasks`;
+
+    const subjectMap = {};
+    todayTasks.forEach(t => {
+      if (!subjectMap[t.subject]) subjectMap[t.subject] = { tasks: [], done: 0, total: 0 };
+      subjectMap[t.subject].tasks.push(t);
+      subjectMap[t.subject].total += t.estimated_minutes || 0;
+      if (t.status === 'completed') subjectMap[t.subject].done += t.estimated_minutes || 0;
+    });
+
+    const list = document.getElementById('subjectList');
+
+    if (Object.keys(subjectMap).length === 0) {
+      list.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">
+          <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+        </div>
+        <div class="empty-title">No tasks for today</div>
+        <div class="empty-sub">Head to Plan tab to set up today's study targets.</div>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = Object.entries(subjectMap).map(([subj, data]) => {
+      const color = SUBJECT_COLORS[subj] || SUBJECT_COLORS.Other;
+      const topics = data.tasks.map(t => esc(t.topic)).join(', ');
+      const remaining = data.total - data.done;
+      const pct = data.total > 0 ? (data.done / data.total) * 100 : 0;
+      const allDone = remaining <= 0;
+
+      return `<div class="subject-card">
+        <div class="subject-card-top">
+          <div class="subject-info">
+            <div class="subject-name-row">
+              <div class="subject-dot" style="background:${color}"></div>
+              <div>
+                <div class="subject-name">${subj}</div>
+                <div class="subject-topics">${topics}</div>
+              </div>
+            </div>
+          </div>
+          <div class="subject-time ${allDone ? 'done' : ''}">
+            ${allDone ? '✓ Done' : fmtMins(remaining)}
+          </div>
+        </div>
+        <div class="subject-progress">
+          <div class="subject-progress-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Plan Rendering ────────────────────────────────────────────────────
+  
+  function renderPlan() {
+    const list = document.getElementById('daysList');
+
+    // Capture expanded day cards before re-render
+    const expandedDays = new Set();
+    list.querySelectorAll('.day-card.expanded').forEach(card => {
+      const id = card.id.replace('daycard-', '');
+      expandedDays.add(id);
+    });
+
+    if (state.days.length === 0) {
+      list.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">
+          <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+          </svg>
+        </div>
+        <div class="empty-title">Plan is empty</div>
+        <div class="empty-sub">Add study days or import a CSV plan to get started.</div>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = state.days.map((day, idx) => {
+      const tasks = state.tasks.filter(t => t.day_id === day.id);
+      const done  = tasks.filter(t => t.status === 'completed').length;
+      const today = day.date === todayStr();
+
+      return `<div class="day-card${expandedDays.has(day.id) ? ' expanded' : ''}" id="daycard-${day.id}">
+        <div class="day-card-header" onclick="App.toggleDayCard('${day.id}')">
+          <div class="day-number-badge">${esc(day.label) || `Day ${idx+1}`}</div>
+          <div class="day-info">
+            <div class="day-label" contenteditable="false" data-day-id="${day.id}" data-field="label">${esc(day.label)}${today ? ' <span class="badge badge-indigo">Today</span>' : ''}</div>
+            <div class="day-meta">${day.date || 'No date'} · ${tasks.length} tasks · ${done}/${tasks.length} done</div>
+          </div>
+          <div class="day-actions" onclick="event.stopPropagation()">
+            <button class="btn-icon-sm" onclick="App.toggleEditDay('${day.id}')" title="Edit day label">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn-icon-sm" onclick="App.deleteDay('${day.id}')" title="Delete day" style="color:var(--rose)">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+            </button>
+          </div>
+          <svg class="day-chevron" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+        </div>
+        <div class="day-tasks">
+          ${tasks.map(task => renderTaskRow(task)).join('')}
+          <div class="day-add-task" onclick="App.openAddTask('${day.id}')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Add task
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderTaskRow(task) {
+    const color = SUBJECT_COLORS[task.subject] || SUBJECT_COLORS.Other;
+    const done  = task.status === 'completed';
+    return `<div class="task-item" data-task-id="${task.id}">
+      <div class="task-check ${done ? 'done' : ''}" onclick="App.toggleTask('${task.id}')">
+        ${done ? '<svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>' : ''}
+      </div>
+      <div class="task-info">
+        <div class="task-subject" style="color:${color}">${task.subject}</div>
+        <div class="task-topic" contenteditable="false" data-field="topic">${esc(task.topic)}</div>
+      </div>
+      <div class="task-time" contenteditable="false" data-field="minutes">${fmtMins(task.estimated_minutes || 0)}</div>
+      <div class="task-actions">
+        <button class="task-edit-btn" onclick="App.toggleEditTask('${task.id}')" title="Edit">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="task-delete" onclick="App.deleteTask('${task.id}')" title="Delete">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }
+
+  function toggleDayCard(dayId) {
+    const card = document.getElementById(`daycard-${dayId}`);
+    if (card) card.classList.toggle('expanded');
+  }
+
+  // ─── Backlog Rendering ─────────────────────────────────────────────────
+  
+  function renderBacklog() {
+    const today = todayStr();
+    const pending = state.tasks.filter(t => {
+      if (t.status === 'completed') return false;
+      const day = state.days.find(d => d.id === t.day_id);
+      if (!day || !day.date) return false;
+      return day.date < today;
+    });
+
+    document.getElementById('backlogCount').textContent = pending.length;
+    const totalMins = pending.reduce((a, t) => a + (t.estimated_minutes || 0), 0);
+    document.getElementById('backlogMins').textContent = totalMins;
+
+    const daysOld = pending.reduce((max, t) => {
+      const day = state.days.find(d => d.id === t.day_id);
+      if (!day || !day.date) return max;
+      const diff = Math.floor((new Date(today) - new Date(day.date)) / 86400000);
+      return Math.max(max, diff);
+    }, 0);
+    document.getElementById('backlogDays').textContent = daysOld;
+
+    const list = document.getElementById('pendingList');
+    if (pending.length === 0) {
+      list.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">
+          <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <div class="empty-title">All clear</div>
+        <div class="empty-sub">No pending units. Your flow is uninterrupted.</div>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = pending.map(t => {
+      const color = SUBJECT_COLORS[t.subject] || SUBJECT_COLORS.Other;
+      const day = state.days.find(d => d.id === t.day_id);
+      return `<div class="pending-item">
+        <div class="pending-dot" style="background:${color}"></div>
+        <div class="pending-info">
+          <div class="pending-subject" style="color:${color}">${t.subject}</div>
+          <div class="pending-topic">${esc(t.topic)}</div>
+          <div class="pending-origin">From ${day ? esc(day.label) : 'Unknown'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <div class="pending-time">${fmtMins(t.estimated_minutes || 0)}</div>
+          <button class="btn-reassign" onclick="App.openReassign('${t.id}')">Move</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Progress Rendering ────────────────────────────────────────────────
+  
+  function renderProgress() {
+    const today = new Date();
+    const last7 = Array.from({length:7}, (_,i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6-i));
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    });
+
+    const recent = state.sessions.filter(s => last7.includes(s.session_date));
+
+    const activeDays = new Set(recent.map(s => s.session_date)).size;
+    const consistency = Math.round((activeDays / 7) * 100);
+
+    const totalSecs = recent.reduce((a,s) => a + (s.duration_seconds||0), 0);
+    const totalMins = Math.floor(totalSecs / 60);
+
+    document.getElementById('metricConsistency').textContent = `${consistency}%`;
+    document.getElementById('metricConsistencySub').textContent = `${activeDays} of 7 days`;
+    document.getElementById('metricTotal').textContent = totalMins >= 60 ? `${Math.floor(totalMins/60)}h` : `${totalMins}m`;
+    document.getElementById('metricSessions').textContent = recent.length;
+    document.getElementById('metricAvg').textContent = activeDays > 0 ? `${Math.round(totalMins/activeDays)}m` : '0m';
+
+    const weekBars = document.getElementById('weekBars');
+    weekBars.innerHTML = last7.map((date, i) => {
+      const dayMins = state.sessions
+        .filter(s => s.session_date === date)
+        .reduce((a,s) => a + Math.floor((s.duration_seconds||0)/60), 0);
+      const maxMins = 240;
+      const pct = Math.min(100, Math.round((dayMins / maxMins) * 100));
+      const d = parseLocalDate(date);
+      const label = ['S','M','T','W','T','F','S'][d.getDay()];
+      const isToday = date === todayStr();
+      return `<div class="week-day-col">
+        <div class="week-bar">
+          <div class="week-bar-fill" style="height:${pct}%;${isToday?'background:linear-gradient(180deg,#f59e0b,rgba(245,158,11,0.5))':''}"></div>
+        </div>
+        <div class="week-day-label" style="${isToday?'color:var(--indigo);font-weight:600':''}">${label}</div>
+      </div>`;
+    }).join('');
+
+    const subjectSecs = {};
+    recent.forEach(s => {
+      subjectSecs[s.subject] = (subjectSecs[s.subject]||0) + (s.duration_seconds||0);
+    });
+
+    const totalSubSecs = Object.values(subjectSecs).reduce((a,b)=>a+b, 0);
+    const subDist = document.getElementById('subjectDist');
+
+    if (totalSubSecs === 0) {
+      subDist.innerHTML = '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:10px 0">No sessions yet</div>';
+    } else {
+      subDist.innerHTML = Object.entries(subjectSecs)
+        .sort(([,a],[,b]) => b-a)
+        .map(([subj, secs]) => {
+          const color = SUBJECT_COLORS[subj] || SUBJECT_COLORS.Other;
+          const pct = Math.round((secs / totalSubSecs) * 100);
+          return `<div class="dist-row">
+            <div class="dist-subject">${subj}</div>
+            <div class="dist-bar-wrap">
+              <div class="dist-bar-fill" style="width:${pct}%;background:${color}"></div>
+            </div>
+            <div class="dist-pct">${pct}%</div>
+          </div>`;
+        }).join('');
+    }
+
+    // Render subject analytics — subject buttons with topic-level detail
+    const analyticsEl = document.getElementById('subjectAnalytics');
+    if (analyticsEl) {
+      if (state.questionAnalytics.length === 0) {
+        analyticsEl.innerHTML = '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:10px 0">No per-question data yet</div>';
+      } else {
+        // Build cumulative subject → topic data
+        const subjData = {};
+        state.questionAnalytics.forEach(qa => {
+          const subj = qa.subject;
+          if (!subjData[subj]) subjData[subj] = { topics: {}, totalQ: 0, totalSecs: 0, sessions: 0 };
+          subjData[subj].totalQ += qa.questions.length;
+          subjData[subj].totalSecs += qa.questions.reduce((a, q) => a + q.seconds, 0);
+          subjData[subj].sessions++;
+
+          const topicName = qa.topic || 'General';
+          if (!subjData[subj].topics[topicName]) {
+            subjData[subj].topics[topicName] = { totalQ: 0, totalSecs: 0, sessions: 0, history: [] };
+          }
+          const td = subjData[subj].topics[topicName];
+          td.totalQ += qa.questions.length;
+          td.totalSecs += qa.questions.reduce((a, q) => a + q.seconds, 0);
+          td.sessions++;
+          td.history.push({ date: qa.date, questions: qa.questions.length, avgSecs: qa.questions.length > 0 ? Math.round(qa.questions.reduce((a, q) => a + q.seconds, 0) / qa.questions.length) : 0 });
+        });
+
+        analyticsEl.innerHTML = Object.entries(subjData).map(([subj, data]) => {
+          const color = SUBJECT_COLORS[subj] || SUBJECT_COLORS.Other;
+          const avgPerQ = data.totalQ > 0 ? Math.round(data.totalSecs / data.totalQ) : 0;
+          const safeKey = encodeURIComponent(subj).replace(/[^a-zA-Z0-9]/g, '_');
+
+          const topicsHtml = Object.entries(data.topics).map(([topic, tData]) => {
+            const topicKey = safeKey + '_' + encodeURIComponent(topic).replace(/[^a-zA-Z0-9]/g, '_');
+            const tAvg = tData.totalQ > 0 ? Math.round(tData.totalSecs / tData.totalQ) : 0;
+            const historyHtml = tData.history.map(h =>
+              `<div class="analytics-history-row"><span class="analytics-history-date">${h.date}</span><span class="analytics-history-stat">${h.questions}Q · avg ${fmtTime(h.avgSecs)}</span></div>`
+            ).join('');
+
+            return `<div class="topic-analytics-item" id="ta-${topicKey}">
+              <div class="topic-analytics-header" onclick="document.getElementById('ta-${topicKey}').classList.toggle('expanded')">
+                <svg class="topic-analytics-arrow" viewBox="0 0 24 24"><polyline points="9,6 15,12 9,18"/></svg>
+                <div class="topic-analytics-name">${topic}</div>
+              </div>
+              <div class="topic-analytics-body">
+                <div class="analytics-metric-row">
+                  <div class="analytics-metric-label">Total Questions</div>
+                  <div class="analytics-metric-value">${tData.totalQ}</div>
+                </div>
+                <div class="analytics-metric-row">
+                  <div class="analytics-metric-label">Avg Time / Question</div>
+                  <div class="analytics-metric-value">${fmtTime(tAvg)}</div>
+                </div>
+                <div class="analytics-metric-row">
+                  <div class="analytics-metric-label">Sessions</div>
+                  <div class="analytics-metric-value">${tData.sessions}</div>
+                </div>
+                ${historyHtml ? '<div class="analytics-history-title">History</div>' + historyHtml : ''}
+              </div>
+            </div>`;
+          }).join('');
+
+          return `<div class="subject-analytics-card" id="sa-${safeKey}">
+            <div class="subject-analytics-header" onclick="App.toggleSubjectAnalytics('${safeKey}')">
+              <div class="subject-analytics-dot" style="background:${color}"></div>
+              <div class="subject-analytics-name">${subj}</div>
+              <div class="subject-analytics-summary">${data.totalQ}Q · ${fmtTime(avgPerQ)} avg</div>
+              <svg class="subject-analytics-chevron" viewBox="0 0 24 24"><polyline points="9,6 15,12 9,18"/></svg>
+            </div>
+            <div class="subject-analytics-body">
+              <div class="analytics-metric-row">
+                <div class="analytics-metric-label">Total Questions</div>
+                <div class="analytics-metric-value">${data.totalQ}</div>
+              </div>
+              <div class="analytics-metric-row">
+                <div class="analytics-metric-label">Avg Time / Question</div>
+                <div class="analytics-metric-value">${fmtTime(avgPerQ)}</div>
+              </div>
+              <div class="analytics-metric-row">
+                <div class="analytics-metric-label">Sessions</div>
+                <div class="analytics-metric-value">${data.sessions}</div>
+              </div>
+              <div class="subject-topics-section">
+                <div class="subject-topics-title">Topics</div>
+                ${topicsHtml}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    const enc = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+    document.getElementById('encourageText').textContent = enc;
+
+    const from = parseLocalDate(last7[0]).toLocaleDateString('en-IN', {day:'numeric',month:'short'});
+    const to   = parseLocalDate(last7[6]).toLocaleDateString('en-IN', {day:'numeric',month:'short'});
+    document.getElementById('progressRange').textContent = `${from} – ${to}`;
+  }
+
+  const ENCOURAGEMENTS = QUOTES;
+
+  function toggleSubjectAnalytics(subjKey) {
+    const card = document.getElementById(`sa-${subjKey}`);
+    if (card) card.classList.toggle('expanded');
+  }
+
+  // ─── Personal Tasks Rendering ──────────────────────────────────────────
+  
+  function renderPersonal() {
+    const list = document.getElementById('personalList');
+    
+    // Update stats
+    const total = state.personalTasks.length;
+    const done = state.personalTasks.filter(t => t.completed).length;
+    const pending = total - done;
+    const totalEl = document.getElementById('personalTotal');
+    const pendingEl = document.getElementById('personalPending');
+    const doneEl = document.getElementById('personalDone');
+    if (totalEl) totalEl.textContent = total;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (doneEl) doneEl.textContent = done;
+
+    if (state.personalTasks.length === 0) {
+      list.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">
+          <svg width="24" height="24" fill="none" stroke="#5a5a7a" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+        </div>
+        <div class="empty-title">No personal tasks</div>
+        <div class="empty-sub">Add quick notes and to-dos here.</div>
+      </div>`;
+      return;
+    }
+
+    // Sort: pending first, then completed
+    const sorted = [...state.personalTasks].sort((a, b) => {
+      if (a.completed === b.completed) return 0;
+      return a.completed ? 1 : -1;
+    });
+
+    list.innerHTML = sorted.map(task => {
+      const dateLabel = task.date ? parseLocalDate(task.date).toLocaleDateString('en-IN', { day:'numeric', month:'short' }) : '';
+      const freq = task.frequency || 'once';
+      const prio = task.priority || 'none';
+      const freqBadge = freq !== 'once' ? `<span class="personal-frequency-badge">${freq === 'daily' ? 'Daily' : 'Weekly'}</span>` : '';
+      const prioDot = prio !== 'none' ? `<div class="personal-priority-dot ${prio}" title="${prio} priority"></div>` : '';
+      return `<div class="personal-item ${task.completed ? 'completed' : ''}">
+        ${prioDot}
+        <div class="personal-check ${task.completed ? 'done' : ''}" onclick="App.togglePersonalTask('${task.id}')">
+          ${task.completed ? '<svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>' : ''}
+        </div>
+        <div class="personal-text ${task.completed ? 'done' : ''}">${esc(task.text)}</div>
+        ${freqBadge}
+        ${dateLabel ? `<div class="personal-date">${dateLabel}</div>` : ''}
+        <button class="personal-delete" onclick="App.deletePersonalTask('${task.id}')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+          </svg>
+        </button>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Settings Rendering ────────────────────────────────────────────────
+  
+  function renderSettings() {
+    document.getElementById('settingEndTime').value   = state.settings.dayEndTime;
+    document.getElementById('settingStartTime').value = state.settings.dayStartTime;
+
+    const nameEl = document.getElementById('settingUserName');
+    if (nameEl) nameEl.value = state.settings.userName || '';
+
+    const n = state.settings.notifications;
+    setToggleState('toggleStudyNotif',    n.study);
+    setToggleState('toggleBrainFog',      n.brainFog);
+    setToggleState('toggleEvening',       n.evening);
+    setToggleState('togglePersonalNotif', n.personal);
+    setToggleState('toggleSound',         state.settings.sound);
+
+    document.querySelectorAll('.theme-chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.theme === state.settings.theme);
+    });
+  }
+
+  function setToggleState(id, on) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', !!on);
+  }
+
+  // ─── Task Management ───────────────────────────────────────────────────
+  
+  function openAddTask(dayId) {
+    state.currentDayId = dayId;
+    state.selectedSubject = null;
+    document.querySelectorAll('.subj-chip').forEach(c => c.classList.remove('active'));
+    document.getElementById('inputTaskTopic').value = '';
+    document.getElementById('inputTaskMins').value  = '';
+    openSheet('sheetAddTask');
+  }
+
+  function selectSubject(btn) {
+    document.querySelectorAll('.subj-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    state.selectedSubject = btn.dataset.subj;
+  }
+
+  function saveTask() {
+    if (!state.currentDayId) { toast('No day selected','error'); return; }
+    const subj  = state.selectedSubject;
+    const topic = document.getElementById('inputTaskTopic').value.trim();
+    const mins  = parseInt(document.getElementById('inputTaskMins').value) || 0;
+
+    if (!subj)  { toast('Pick a subject', 'error'); return; }
+    if (!topic) { toast('Enter a topic', 'error');  return; }
+
+    const task = {
+      id: uid(), day_id: state.currentDayId,
+      subject: subj, topic, estimated_minutes: mins,
+      status: 'pending', created_at: new Date().toISOString()
+    };
+
+    state.tasks.push(task);
+    DB.save();
+    Supa.insertTask(task);
+    closeSheet();
+    renderPlan();
+    renderHome();
+    toast('Task added', 'success');
+  }
+
+  function toggleTask(taskId) {
+    const task = state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task.status = task.status === 'completed' ? 'pending' : 'completed';
+    DB.save();
+    Supa.updateTask(taskId, { status: task.status });
+    renderPlan();
+    renderHome();
+    renderBacklog();
+  }
+
+  function deleteTask(taskId) {
+    if (!confirm('Delete this task?')) return;
+    
+    state.tasks = state.tasks.filter(t => t.id !== taskId);
+    DB.save();
+    Supa.deleteTask(taskId);
+    renderPlan();
+    renderHome();
+    renderBacklog();
+    toast('Task removed');
+  }
+
+  function toggleEditTask(taskId) {
+    const taskItem = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!taskItem) return;
+
+    const topicEl = taskItem.querySelector('[data-field="topic"]');
+    const minsEl  = taskItem.querySelector('[data-field="minutes"]');
+    const editBtn = taskItem.querySelector('.task-edit-btn');
+
+    const isEditing = topicEl.getAttribute('contenteditable') === 'true';
+
+    if (isEditing) {
+      const newTopic = topicEl.textContent.trim();
+      const minsText = minsEl.textContent.trim();
+      
+      let newMins = 0;
+      const hMatch = minsText.match(/(\d+)h/);
+      const mMatch = minsText.match(/(\d+)m/);
+      if (hMatch) newMins += parseInt(hMatch[1]) * 60;
+      if (mMatch) newMins += parseInt(mMatch[1]);
+      if (!hMatch && !mMatch) {
+        const plain = parseInt(minsText.trim(), 10);
+        if (!isNaN(plain) && plain > 0) newMins = plain;
+      }
+      
+      if (!newTopic || newMins <= 0) {
+        toast('Invalid task data', 'error');
+        return;
+      }
+
+      const task = state.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.topic = newTopic;
+        task.estimated_minutes = newMins;
+        DB.save();
+        Supa.updateTask(taskId, { topic: newTopic, estimated_minutes: newMins });
+        toast('Task updated', 'success');
+      }
+
+      topicEl.setAttribute('contenteditable', 'false');
+      minsEl.setAttribute('contenteditable', 'false');
+      editBtn.classList.remove('editing');
+      
+      renderPlan();
+      renderHome();
+      renderBacklog();
+    } else {
+      topicEl.setAttribute('contenteditable', 'true');
+      minsEl.setAttribute('contenteditable', 'true');
+      editBtn.classList.add('editing');
+      topicEl.focus();
+      
+      minsEl.addEventListener('focus', () => {
+        const range = document.createRange();
+        range.selectNodeContents(minsEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }, { once: true });
+    }
+  }
+
+  // ─── Day Management ────────────────────────────────────────────────────
+  
+  function saveDay() {
+    const label = document.getElementById('inputDayLabel').value.trim();
+    const date  = document.getElementById('inputDayDate').value;
+    if (!label) { toast('Enter a label', 'error'); return; }
+
+    const day = { id: uid(), label, date: date || null, created_at: new Date().toISOString() };
+    state.days.push(day);
+    DB.save();
+    Supa.insertDay(day);
+    closeSheet();
+    renderPlan();
+    renderHome();
+    toast('Day added', 'success');
+  }
+
+  function toggleEditDay(dayId) {
+    const labelEl = document.querySelector(`[data-day-id="${dayId}"][data-field="label"]`);
+    if (!labelEl) return;
+
+    const isEditing = labelEl.getAttribute('contenteditable') === 'true';
+
+    if (isEditing) {
+      const newLabel = labelEl.textContent.trim();
+      if (!newLabel) {
+        toast('Day label cannot be empty', 'error');
+        return;
+      }
+
+      const day = state.days.find(d => d.id === dayId);
+      if (day) {
+        day.label = newLabel;
+        DB.save();
+        Supa.updateDay(dayId, { label: newLabel });
+        toast('Day label updated', 'success');
+      }
+
+      labelEl.setAttribute('contenteditable', 'false');
+      renderPlan();
+      renderHome();
+    } else {
+      const badgeEl = labelEl.querySelector('.badge');
+      if (badgeEl) badgeEl.remove();
+      
+      labelEl.setAttribute('contenteditable', 'true');
+      labelEl.focus();
+      
+      const range = document.createRange();
+      range.selectNodeContents(labelEl);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
+  function deleteDay(dayId) {
+    const day = state.days.find(d => d.id === dayId);
+    if (!day) return;
+
+    const tasksToDelete = state.tasks.filter(t => t.day_id === dayId);
+    const tasksCount = tasksToDelete.length;
+    
+    if (!confirm(`Delete "${day.label}" and ${tasksCount} task(s)?`)) return;
+
+    state.tasks = state.tasks.filter(t => t.day_id !== dayId);
+    state.days = state.days.filter(d => d.id !== dayId);
+    
+    DB.save();
+    Promise.all(tasksToDelete.map(t => Supa.deleteTask(t.id)))
+      .then(() => Supa.deleteDay(dayId));
+    
+    renderPlan();
+    renderHome();
+    renderBacklog();
+    toast('Day deleted', 'success');
+  }
+
+  // ─── Backlog Operations ────────────────────────────────────────────────
+  
+  function openReassign(taskId) {
+    state.reassignTaskId = taskId;
+    const container = document.getElementById('reassignDayList');
+    container.innerHTML = state.days.map(day => {
+      return `<div class="session-pick-item" onclick="App.reassignTask('${day.id}')">
+        <div class="pick-info">
+          <div class="pick-subj">${esc(day.label)}</div>
+          <div style="font-size:12px;color:var(--text-3)">${day.date || 'No date'}</div>
+        </div>
+      </div>`;
+    }).join('') || '<div style="padding:16px;color:var(--text-3);font-size:13px">No days available</div>';
+    openSheet('sheetReassign');
+  }
+
+  function reassignTask(dayId) {
+    const task = state.tasks.find(t => t.id === state.reassignTaskId);
+    if (task) {
+      task.day_id = dayId;
+      DB.save();
+      Supa.updateTask(task.id, { day_id: dayId });
+    }
+    closeSheet();
+    renderBacklog();
+    renderHome();
+    toast('Task moved', 'success');
+  }
+
+  // ─── Focus Session ─────────────────────────────────────────────────────
+  
+  function startSessionFlow() {
+    if (session.active) {
+      toast('A session is already running', '');
+      return;
+    }
+    const today = todayStr();
+    const todayDay = state.days.find(d => d.date === today);
+    const pending = todayDay
+      ? state.tasks.filter(t => t.day_id === todayDay.id && t.status === 'pending')
+      : [];
+
+    const backlog = state.tasks.filter(t => {
+      if (t.status === 'completed') return false;
+      const day = state.days.find(d => d.id === t.day_id);
+      return day && day.date && day.date < today;
+    });
+
+    const allAvailable = [...pending, ...backlog];
+
+    if (allAvailable.length === 0) {
+      toast('No pending tasks — great job!', 'success');
+      return;
+    }
+
+    const list = document.getElementById('sessionSubjectList');
+    list.innerHTML = allAvailable.map(t => {
+      const color = SUBJECT_COLORS[t.subject] || SUBJECT_COLORS.Other;
+      const day = state.days.find(d => d.id === t.day_id);
+      return `<div class="session-pick-item" onclick="App.startSession('${t.id}')">
+        <div class="pick-dot" style="background:${color}"></div>
+        <div class="pick-info">
+          <div class="pick-subj" style="color:${color}">${t.subject}</div>
+          <div class="pick-topic">${esc(t.topic)}</div>
+          ${day && day.date !== today ? `<div style="font-size:11px;color:var(--text-3)">From ${esc(day.label)}</div>` : ''}
+        </div>
+        <div class="pick-time">${fmtMins(t.estimated_minutes||0)}</div>
+      </div>`;
+    }).join('');
+    openSheet('sheetSessionPicker');
+  }
+
+  function startSession(taskId) {
+    const task = state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    closeSheet();
+
+    session.taskId    = taskId;
+    session.subject   = task.subject;
+    session.topic     = task.topic;
+
+    openSheet('sheetSessionMode');
+  }
+
+  function startSessionWithMode(mode) {
+    const task = state.tasks.find(t => t.id === session.taskId);
+    if (!task) return;
+
+    closeSheet();
+
+    session.active    = true;
+    session.paused    = false;
+    session.startTime = Date.now();
+    session.elapsed   = 0;
+    session.mode      = mode;
+    session.questions = [];
+    session.currentQuestionStart = Date.now();
+    session.questionElapsed = 0;
+
+    document.getElementById('sessionSubject').textContent = task.subject;
+    document.getElementById('sessionTopic').textContent   = task.topic;
+    document.getElementById('sessionTimer').textContent   = '00:00';
+    document.getElementById('sessionStatus').textContent  = 'RUNNING';
+    document.getElementById('btnPauseSession').textContent = 'Pause';
+    document.getElementById('sessionOverlay').classList.add('active');
+
+    const pqPanel = document.getElementById('perQuestionPanel');
+    if (mode === 'perQuestion') {
+      pqPanel.style.display = '';
+      document.getElementById('questionNumber').textContent = '1';
+      document.getElementById('questionTimer').textContent = '00:00';
+    } else {
+      pqPanel.style.display = 'none';
+    }
+
+    session.timerRef = setInterval(tickSession, 1000);
+  }
+
+  function tickSession() {
+    if (!session.active || session.paused) return;
+    session.elapsed = Math.floor((Date.now() - session.startTime) / 1000);
+    document.getElementById('sessionTimer').textContent = fmtTime(session.elapsed);
+
+    if (session.mode === 'perQuestion' && session.currentQuestionStart) {
+      session.questionElapsed = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
+      const qtEl = document.getElementById('questionTimer');
+      if (qtEl) qtEl.textContent = fmtTime(session.questionElapsed);
+    }
+  }
+
+  function pauseSession() {
+    if (!session.active) return;
+    if (!session.paused) {
+      session.paused  = true;
+      session.pausedAt = Date.now();
+      document.getElementById('btnPauseSession').textContent = 'Resume';
+      document.getElementById('sessionStatus').textContent  = 'PAUSED';
+    } else {
+      const pausedDuration = Date.now() - session.pausedAt;
+      session.startTime += pausedDuration;
+      if (session.mode === 'perQuestion' && session.currentQuestionStart) {
+        session.currentQuestionStart += pausedDuration;
+      }
+      session.paused   = false;
+      session.pausedAt = null;
+      document.getElementById('btnPauseSession').textContent = 'Pause';
+      document.getElementById('sessionStatus').textContent  = 'RUNNING';
+    }
+  }
+
+  function endSession() {
+    if (!session.active) return;
+    clearInterval(session.timerRef);
+
+    // Adjust for pause FIRST, before capturing final question data
+    if (session.paused) {
+      const pausedDuration = Date.now() - session.pausedAt;
+      session.startTime += pausedDuration;
+      if (session.mode === 'perQuestion' && session.currentQuestionStart) {
+        session.currentQuestionStart += pausedDuration;
+      }
+      session.paused = false;
+    }
+
+    // Capture final per-question data (now pause-adjusted)
+    if (session.mode === 'perQuestion' && session.currentQuestionStart) {
+      const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
+      if (qTime > 0) {
+        session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: false });
+      }
+    }
+
+    const finalElapsed = Math.floor((Date.now() - session.startTime) / 1000);
+    document.getElementById('sessionOverlay').classList.remove('active');
+    document.getElementById('perQuestionPanel').style.display = 'none';
+
+    if (finalElapsed < 10) {
+      session.active = false;
+      return;
+    }
+
+    const record = {
+      id: uid(),
+      subject: session.subject,
+      topic: session.topic,
+      duration_seconds: finalElapsed,
+      session_date: todayStr(),
+      created_at: new Date().toISOString(),
+    };
+
+    state.sessions.push(record);
+
+    const task = state.tasks.find(t => t.id === session.taskId);
+    if (task) {
+      const sesMins = Math.floor(finalElapsed / 60);
+      if (sesMins >= (task.estimated_minutes || 0) * 0.8) {
+        task.status = 'completed';
+        Supa.updateTask(task.id, { status: 'completed' });
+      }
+    }
+
+    // Store per-question analytics
+    if (session.mode === 'perQuestion' && session.questions.length > 0) {
+      const qaRecord = {
+        id: uid(),
+        sessionId: record.id,
+        subject: session.subject,
+        topic: session.topic,
+        date: todayStr(),
+        questions: session.questions,
+        created_at: new Date().toISOString(),
+      };
+      state.questionAnalytics.push(qaRecord);
+    }
+
+    DB.save();
+    Supa.insertSession(record);
+    session.active = false;
+
+    renderHome();
+    renderProgress();
+    renderBacklog();
+
+    // Show summary overlay
+    showSessionSummary(record, session.questions, session.mode);
+
+    if (state.settings.sound) playEndTone();
+  }
+
+  function showSessionSummary(record, questions, mode) {
+    const statsEl = document.getElementById('summaryStats');
+    const detailsEl = document.getElementById('summaryDetails');
+    const totalMins = Math.floor(record.duration_seconds / 60);
+    const totalSecs = record.duration_seconds % 60;
+
+    let statsHtml = `
+      <div class="summary-stat-card">
+        <div class="summary-stat-value">${fmtTime(record.duration_seconds)}</div>
+        <div class="summary-stat-label">Total Time</div>
+      </div>
+      <div class="summary-stat-card">
+        <div class="summary-stat-value">${record.subject}</div>
+        <div class="summary-stat-label">Subject</div>
+      </div>`;
+
+    if (mode === 'perQuestion' && questions.length > 0) {
+      const avgSecs = Math.round(questions.reduce((a, q) => a + q.seconds, 0) / questions.length);
+      statsHtml += `
+        <div class="summary-stat-card">
+          <div class="summary-stat-value">${questions.length}</div>
+          <div class="summary-stat-label">Questions</div>
+        </div>
+        <div class="summary-stat-card">
+          <div class="summary-stat-value">${fmtTime(avgSecs)}</div>
+          <div class="summary-stat-label">Avg / Question</div>
+        </div>`;
+    }
+
+    statsEl.innerHTML = statsHtml;
+
+    let detailsHtml = '';
+    if (mode === 'perQuestion' && questions.length > 0) {
+      const avgSecs = Math.round(questions.reduce((a, q) => a + q.seconds, 0) / questions.length);
+      detailsHtml += '<div class="summary-section-title">Question Breakdown</div>';
+      detailsHtml += questions.map(q => {
+        const slow = q.seconds > avgSecs * 1.5 ? ' slow' : '';
+        return `<div class="summary-question-item">
+          <div class="summary-question-num">${q.skipped ? 'Skipped' : 'Q' + q.number}</div>
+          <div class="summary-question-time${slow}">${fmtTime(q.seconds)}</div>
+        </div>`;
+      }).join('');
+    }
+    detailsEl.innerHTML = detailsHtml;
+
+    document.getElementById('sessionSummaryOverlay').classList.add('active');
+  }
+
+  function closeSummary() {
+    document.getElementById('sessionSummaryOverlay').classList.remove('active');
+  }
+
+  function nextQuestion() {
+    if (!session.active || session.paused || session.mode !== 'perQuestion') return;
+    const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
+    session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: false });
+    session.currentQuestionStart = Date.now();
+    session.questionElapsed = 0;
+    document.getElementById('questionNumber').textContent = session.questions.length + 1;
+    document.getElementById('questionTimer').textContent = '00:00';
+  }
+
+  function skipQuestion() {
+    if (!session.active || session.paused || session.mode !== 'perQuestion') return;
+    const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
+    session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: true });
+    session.currentQuestionStart = Date.now();
+    session.questionElapsed = 0;
+    document.getElementById('questionNumber').textContent = session.questions.length + 1;
+    document.getElementById('questionTimer').textContent = '00:00';
+  }
+
+  function playEndTone() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 528;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+      osc.start(); osc.stop(ctx.currentTime + 1.2);
+    } catch(e) {}
+  }
+
+  // ─── CSV Import (FIXED: Date Logic) ───────────────────────────────────
+  
+  async function handleCSVImport(file) {
+    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+      toast('Please select a valid CSV file', 'error');
+      return;
+    }
+
+    const proc = document.getElementById('csvProcessing');
+    proc.classList.add('active');
+    document.getElementById('csvStatus').textContent = 'Reading CSV…';
+
+    try {
+      const text = await file.text();
+      document.getElementById('csvStatus').textContent = 'Parsing data…';
+      
+      const parsed = Papa.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: h => h.trim().toLowerCase().replace(/\s+/g, '_')
+      });
+
+      if (parsed.errors.length > 0) {
+        proc.classList.remove('active');
+        toast('CSV parsing error — check file format', 'error');
+        return;
+      }
+
+      const rows = parsed.data;
+      if (rows.length === 0) {
+        proc.classList.remove('active');
+        toast('CSV file is empty', 'error');
+        return;
+      }
+
+      const requiredCols = ['day', 'subject', 'topic', 'estimated_minutes'];
+      const firstRow = rows[0];
+      const missing = requiredCols.filter(col => !(col in firstRow));
+      
+      if (missing.length > 0) {
+        proc.classList.remove('active');
+        toast(`Missing columns: ${missing.join(', ')}`, 'error');
+        return;
+      }
+
+      document.getElementById('csvStatus').textContent = 'Validating data…';
+
+      const errors = [];
+      rows.forEach((row, idx) => {
+        if (!row.day || !row.subject || !row.topic) {
+          errors.push(`Row ${idx + 2}: Missing required field`);
+        }
+        const mins = parseInt(row.estimated_minutes);
+        if (isNaN(mins) || mins <= 0) {
+          errors.push(`Row ${idx + 2}: Invalid estimated_minutes`);
+        }
+      });
+
+      if (errors.length > 0) {
+        proc.classList.remove('active');
+        const detail = errors[0] + (errors.length > 1 ? ` (+${errors.length - 1} more)` : '');
+        toast(detail, 'error');
+        console.error('CSV errors:', errors);
+        return;
+      }
+
+      document.getElementById('csvStatus').textContent = 'Preparing preview…';
+
+      const dayGroups = {};
+      rows.forEach(row => {
+        const dayKey = row.day.trim();
+        if (!dayGroups[dayKey]) dayGroups[dayKey] = [];
+        dayGroups[dayKey].push(row);
+      });
+
+      csvParsedData = dayGroups;
+      proc.classList.remove('active');
+      showCSVSelectionUI(dayGroups);
+
+    } catch (err) {
+      console.error('CSV import error:', err);
+      proc.classList.remove('active');
+      toast('Import failed — check file format', 'error');
+    }
+  }
+
+  // ─── CSV Selection UI ───────────────────────────────────────────────────
+
+  function showCSVSelectionUI(dayGroups) {
+    const dayKeys = Object.keys(dayGroups);
+    const baseDate = new Date();
+
+    // Initialize selection state — all selected by default
+    csvSelection = {};
+    dayKeys.forEach((dayKey, i) => {
+      const localDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + i);
+      const y = localDate.getFullYear();
+      const m = String(localDate.getMonth() + 1).padStart(2, '0');
+      const d = String(localDate.getDate()).padStart(2, '0');
+      csvSelection[dayKey] = {
+        selected: true,
+        tasks: dayGroups[dayKey].map(() => true),
+        date: `${y}-${m}-${d}`
+      };
+    });
+
+    renderCSVSelectionList(dayGroups);
+    openSheet('sheetCSVImport');
+  }
+
+  function renderCSVSelectionList(dayGroups) {
+    const dayKeys = Object.keys(dayGroups || csvParsedData || {});
+    const listEl = document.getElementById('csvImportList');
+    if (!listEl) return;
+
+    const data = dayGroups || csvParsedData;
+    if (!data) return;
+
+    listEl.innerHTML = dayKeys.map((dayKey, dayIdx) => {
+      const sel = csvSelection[dayKey];
+      if (!sel) return '';
+      const tasks = data[dayKey];
+      const dayChecked = sel.selected;
+
+      const checkSvg12 = '<svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>';
+      const checkSvg10 = '<svg width="10" height="10" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>';
+
+      return `<div class="csv-day-group" data-day-idx="${dayIdx}">
+        <div class="csv-day-header" onclick="App.toggleCSVDay(${dayIdx})">
+          <div class="csv-day-check ${dayChecked ? 'checked' : ''}" data-day-check="${dayIdx}">
+            ${dayChecked ? checkSvg12 : ''}
+          </div>
+          <div class="csv-day-label">${esc(dayKey)}</div>
+          <input type="date" class="csv-day-date-input" data-day-date="${dayIdx}" value="${sel.date}" onclick="event.stopPropagation()" onchange="App.updateCSVDayDate(${dayIdx}, this.value)">
+        </div>
+        <div class="csv-task-list">
+          ${tasks.map((row, idx) => {
+            const color = SUBJECT_COLORS[row.subject.trim()] || SUBJECT_COLORS.Other;
+            const taskChecked = sel.tasks[idx];
+            return `<div class="csv-task-item" data-task-idx="${dayIdx}-${idx}">
+              <div class="csv-task-check ${taskChecked ? 'checked' : ''}" data-task-check="${dayIdx}-${idx}" onclick="App.toggleCSVTask(${dayIdx},${idx})">
+                ${taskChecked ? checkSvg10 : ''}
+              </div>
+              <div class="csv-task-info">
+                <div class="csv-task-subj" style="color:${color}">${esc(row.subject.trim())}</div>
+                <div class="csv-task-topic">${esc(row.topic.trim())}</div>
+              </div>
+              <div class="csv-task-mins">${row.estimated_minutes}m</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function updateCSVDayDate(dayIdx, value) {
+    const dayKeys = Object.keys(csvParsedData || {});
+    const dayKey = dayKeys[dayIdx];
+    if (dayKey && csvSelection[dayKey]) {
+      csvSelection[dayKey].date = value;
+    }
+  }
+
+  function toggleCSVDay(dayIdx) {
+    const dayKeys = Object.keys(csvParsedData || {});
+    const dayKey = dayKeys[dayIdx];
+    if (!dayKey || !csvSelection[dayKey]) return;
+
+    const sel = csvSelection[dayKey];
+    sel.selected = !sel.selected;
+    sel.tasks = sel.tasks.map(() => sel.selected);
+    renderCSVSelectionList(csvParsedData);
+  }
+
+  function toggleCSVTask(dayIdx, taskIdx) {
+    const dayKeys = Object.keys(csvParsedData || {});
+    const dayKey = dayKeys[dayIdx];
+    if (!dayKey || !csvSelection[dayKey]) return;
+
+    const sel = csvSelection[dayKey];
+    sel.tasks[taskIdx] = !sel.tasks[taskIdx];
+    // Update day checkbox if all tasks are deselected/selected
+    sel.selected = sel.tasks.some(t => t);
+    renderCSVSelectionList(csvParsedData);
+  }
+
+  async function confirmCSVImport() {
+    if (!csvParsedData) return;
+    const dayKeys = Object.keys(csvParsedData);
+    let addedDays = 0, addedTasks = 0;
+
+    for (const dayKey of dayKeys) {
+      const sel = csvSelection[dayKey];
+      if (!sel || !sel.selected) continue;
+
+      // Use STRICT local date from selection state
+      const dateStr = sel.date || todayStr();
+
+      const dayTasks = csvParsedData[dayKey];
+      const selectedTasks = [];
+
+      dayTasks.forEach((row, idx) => {
+        if (sel.tasks[idx]) {
+          selectedTasks.push(row);
+        }
+      });
+
+      if (selectedTasks.length === 0) continue;
+
+      const day = {
+        id: uid(),
+        label: dayKey,
+        date: dateStr,
+        created_at: new Date().toISOString()
+      };
+
+      state.days.push(day);
+      await Supa.insertDay(day);
+      addedDays++;
+
+      for (const row of selectedTasks) {
+        const task = {
+          id: uid(),
+          day_id: day.id,
+          subject: row.subject.trim(),
+          topic: row.topic.trim(),
+          estimated_minutes: parseInt(row.estimated_minutes),
+          status: 'pending',
+          created_at: new Date().toISOString()
+        };
+        state.tasks.push(task);
+        await Supa.insertTask(task);
+        addedTasks++;
+      }
+    }
+
+    DB.save();
+    csvParsedData = null;
+    csvSelection = {};
+    closeSheet();
+    renderPlan();
+    renderHome();
+    toast(`Imported ${addedDays} days, ${addedTasks} tasks`, 'success');
+  }
+
+  // ─── Personal Tasks ────────────────────────────────────────────────────
+  
+  function addPersonalTask() {
+    const input = document.getElementById('personalInput');
+    if (!input) return;
+    const text = input.value.trim();
+    
+    if (!text) return;
+
+    const freqChip = document.querySelector('#personalFrequencyChips .personal-chip.active');
+    const prioChip = document.querySelector('#personalPriorityChips .personal-chip.active');
+    const frequency = freqChip ? freqChip.dataset.frequency : 'once';
+    const priority = prioChip ? prioChip.dataset.priority : 'none';
+
+    const task = {
+      id: uid(),
+      text,
+      completed: false,
+      date: todayStr(),
+      created_at: new Date().toISOString(),
+      frequency,
+      priority,
+    };
+
+    state.personalTasks.push(task);
+    DB.save();
+    Supa.insertPersonalTask(task);
+    
+    input.value = '';
+    // Reset chips to defaults
+    document.querySelectorAll('#personalFrequencyChips .personal-chip').forEach(c => c.classList.toggle('active', c.dataset.frequency === 'once'));
+    document.querySelectorAll('#personalPriorityChips .personal-chip').forEach(c => c.classList.toggle('active', c.dataset.priority === 'none'));
+    renderPersonal();
+    toast('Personal task added');
+  }
+
+  function togglePersonalTask(id) {
+    const task = state.personalTasks.find(t => t.id === id);
+    if (!task) return;
+    
+    task.completed = !task.completed;
+
+    // Handle recurrence: when completing a recurring task, schedule next occurrence
+    if (task.completed && task.frequency && task.frequency !== 'once') {
+      const now = new Date();
+      let nextDate;
+      if (task.frequency === 'daily') {
+        nextDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      } else if (task.frequency === 'weekly') {
+        nextDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+      }
+      if (nextDate) {
+        const y = nextDate.getFullYear();
+        const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+        const d = String(nextDate.getDate()).padStart(2, '0');
+        const newTask = {
+          id: uid(),
+          text: task.text,
+          completed: false,
+          date: `${y}-${m}-${d}`,
+          created_at: new Date().toISOString(),
+          frequency: task.frequency,
+          priority: task.priority || 'none',
+        };
+        state.personalTasks.push(newTask);
+        Supa.insertPersonalTask(newTask);
+      }
+    }
+
+    DB.save();
+    Supa.updatePersonalTask(id, { completed: task.completed });
+    renderPersonal();
+  }
+
+  function deletePersonalTask(id) {
+    if (!confirm('Delete this personal task?')) return;
+    
+    state.personalTasks = state.personalTasks.filter(t => t.id !== id);
+    DB.save();
+    Supa.deletePersonalTask(id);
+    renderPersonal();
+  }
+
+  // ─── Push Notifications ────────────────────────────────────────────────
+  
+  async function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+      toast('Notifications not supported', 'error');
+      return false;
+    }
+
+    if (Notification.permission === 'granted') return true;
+
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
+  }
+
+  async function subscribeToPushNotifications() {
+    try {
+      const hasPermission = await requestNotificationPermission();
+      if (!hasPermission) {
+        toast('Notification permission denied', 'error');
+        return { success: false, error: 'Permission denied' };
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      
+      let subscription = await registration.pushManager.getSubscription();
+      
+      if (!subscription) {
+        const vapidPublicKey = BEy_F1htue07CuKuuZ9W_ona_4Jwer5MzMzBovAzYosHkzoWR4hKEPF3fuAHUCUgAGjgIq0dFgei9AqC_JqIuFI;
+        
+        if (!vapidPublicKey) {
+          console.warn('VAPID key not configured');
+          return { success: false, error: 'VAPID key not configured' };
+        }
+
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        });
+      }
+
+      const result = await Supa.savePushSubscription(subscription);
+      
+      if (result.success) {
+        state.pushSubscription = subscription.toJSON();
+        DB.save();
+        return { success: true, subscription };
+      }
+
+      return result;
+
+    } catch (err) {
+      console.error('Push subscription error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  // ─── Settings ──────────────────────────────────────────────────────────
+  
+  function toggleSetting(el) {
+    el.classList.toggle('on');
+    const id = el.id;
+    const on = el.classList.contains('on');
+    
+    if (id === 'toggleStudyNotif')    state.settings.notifications.study = on;
+    if (id === 'toggleBrainFog')      state.settings.notifications.brainFog = on;
+    if (id === 'toggleEvening')       state.settings.notifications.evening = on;
+    if (id === 'togglePersonalNotif') state.settings.notifications.personal = on;
+    if (id === 'toggleSound')         state.settings.sound = on;
+    
+    DB.save();
+
+    if (on && id !== 'toggleSound') {
+      subscribeToPushNotifications();
+    }
+  }
+
+  function setTheme(theme, btn) {
+    state.settings.theme = theme;
+    document.querySelectorAll('.theme-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.documentElement.dataset.theme = theme;
+    DB.save();
+  }
+
+  async function saveSupabaseConfig() {
+    showSupabaseStatus('Connecting...', 'info');
+
+    const initResult = await Supa.init(SUPABASE_URL, SUPABASE_KEY);
+    
+    if (!initResult.success) {
+      showSupabaseStatus(`Connection failed: ${initResult.error}`, 'error');
+      return;
+    }
+
+    showSupabaseStatus('Connected! Syncing data...', 'info');
+
+    const [daysResult, tasksResult, sessionsResult, personalResult, analyticsResult] = await Promise.all([
+      Supa.syncDays(),
+      Supa.syncTasks(),
+      Supa.syncSessions(),
+      Supa.syncPersonalTasks(),
+      Supa.syncQuestionAnalytics(),
+    ]);
+
+    const totalSynced = 
+      (daysResult.count || 0) + 
+      (tasksResult.count || 0) + 
+      (sessionsResult.count || 0) +
+      (personalResult.count || 0) +
+      (analyticsResult.count || 0);
+
+    if (totalSynced === 0) {
+      showSupabaseStatus('Already Synced', 'info');
+    } else {
+      showSupabaseStatus(`Sync Successful — ${totalSynced} items synced`, 'success');
+    }
+
+    renderHome();
+    renderPlan();
+    renderProgress();
+    renderPersonal();
+  }
+
+  function showSupabaseStatus(message, type) {
+    const statusEl = document.getElementById('supabaseStatus');
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.className = `supabase-status ${type}`;
+    statusEl.style.display = 'block';
+  }
+
+  function handleInstall() {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(c => {
+        if (c.outcome === 'accepted') toast('App installed!', 'success');
+        deferredInstallPrompt = null;
+      });
+    } else {
+      toast('Open in Chrome and use "Add to Home Screen" from the menu', '');
+    }
+  }
+
+  function clearData() {
+    if (!confirm('Clear all local data? This cannot be undone.')) return;
+    state.days = []; 
+    state.tasks = []; 
+    state.sessions = [];
+    state.personalTasks = [];
+    state.questionAnalytics = [];
+    DB.save();
+    renderHome(); 
+    renderPlan(); 
+    renderBacklog(); 
+    renderProgress();
+    renderPersonal();
+    toast('Data cleared');
+  }
+
+  // ─── Init ──────────────────────────────────────────────────────────────
+  
+  function init() {
+    DB.load();
+
+    if (state.settings.theme) {
+      document.documentElement.dataset.theme = state.settings.theme;
+    }
+
+    startClock();
+    loadRandomQuote();
+    renderHome();
+    renderProgress();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('[FE] SW registered'))
+        .catch(err => console.warn('[FE] SW error', err));
+    }
+
+    // Event bindings
+    document.getElementById('btnStartSession').addEventListener('click', startSessionFlow);
+    document.getElementById('btnEndSession').addEventListener('click', endSession);
+    document.getElementById('btnPauseSession').addEventListener('click', pauseSession);
+    
+    document.getElementById('btnAddDay').addEventListener('click', () => {
+      document.getElementById('inputDayLabel').value = '';
+      document.getElementById('inputDayDate').value = todayStr();
+      openSheet('sheetAddDay');
+    });
+
+    // CSV import button
+    document.getElementById('btnImportCSV').addEventListener('click', () => {
+      document.getElementById('csvFileInput').click();
+    });
+
+    document.getElementById('csvFileInput').addEventListener('change', e => {
+      if (e.target.files[0]) handleCSVImport(e.target.files[0]);
+      e.target.value = '';
+    });
+
+    document.getElementById('btnAddPersonal').addEventListener('click', addPersonalTask);
+    document.getElementById('personalInput').addEventListener('keypress', e => {
+      if (e.key === 'Enter') addPersonalTask();
+    });
+
+    // Personal task frequency/priority chip selectors
+    document.querySelectorAll('#personalFrequencyChips .personal-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#personalFrequencyChips .personal-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
+    document.querySelectorAll('#personalPriorityChips .personal-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#personalPriorityChips .personal-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
+
+    const btnInstallEl = document.getElementById('btnInstall');
+    if (btnInstallEl) btnInstallEl.addEventListener('click', handleInstall);
+    document.getElementById('btnClearData').addEventListener('click', clearData);
+
+    ['settingEndTime', 'settingStartTime'].forEach(id => {
+      document.getElementById(id).addEventListener('change', e => {
+        if (id === 'settingEndTime')   state.settings.dayEndTime   = e.target.value;
+        if (id === 'settingStartTime') state.settings.dayStartTime = e.target.value;
+        DB.save();
+      });
+    });
+
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+    });
+
+    // User name setting
+    const userNameInput = document.getElementById('settingUserName');
+    if (userNameInput) {
+      userNameInput.addEventListener('change', e => {
+        state.settings.userName = e.target.value.trim();
+        DB.save();
+        updateClock();
+      });
+    }
+
+    // CSV import buttons
+    const csvSelectAll = document.getElementById('csvSelectAll');
+    if (csvSelectAll) {
+      csvSelectAll.addEventListener('click', () => {
+        if (!csvParsedData) return;
+        Object.keys(csvSelection).forEach(key => {
+          csvSelection[key].selected = true;
+          csvSelection[key].tasks = csvSelection[key].tasks.map(() => true);
+        });
+        renderCSVSelectionList(csvParsedData);
+      });
+    }
+    const csvDeselectAll = document.getElementById('csvDeselectAll');
+    if (csvDeselectAll) {
+      csvDeselectAll.addEventListener('click', () => {
+        if (!csvParsedData) return;
+        Object.keys(csvSelection).forEach(key => {
+          csvSelection[key].selected = false;
+          csvSelection[key].tasks = csvSelection[key].tasks.map(() => false);
+        });
+        renderCSVSelectionList(csvParsedData);
+      });
+    }
+    const csvConfirm = document.getElementById('csvImportConfirm');
+    if (csvConfirm) {
+      csvConfirm.addEventListener('click', confirmCSVImport);
+    }
+
+    // Per-question buttons
+    const btnNext = document.getElementById('btnNextQuestion');
+    if (btnNext) btnNext.addEventListener('click', nextQuestion);
+    const btnSkip = document.getElementById('btnSkipQuestion');
+    if (btnSkip) btnSkip.addEventListener('click', skipQuestion);
+
+    // Navigation guard - prevent accidental PWA exit
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', function(e) {
+      history.pushState(null, '', location.href);
+      if (session.active) {
+        toast('End the session before navigating', '');
+        return;
+      }
+      const openSheetEl = document.querySelector('.bottom-sheet.active');
+      if (openSheetEl) {
+        closeSheet();
+        return;
+      }
+      const activeTab = document.querySelector('.tab-panel.active');
+      if (activeTab && activeTab.id !== 'tab-home') {
+        const homeBtn = document.querySelector('.nav-item[data-tab="home"]');
+        switchTab('home', homeBtn);
+      }
+    });
+
+    // Keyboard accessibility
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const summary = document.getElementById('sessionSummaryOverlay');
+        if (summary && summary.classList.contains('active')) {
+          closeSummary();
+          return;
+        }
+        const openSheetEl = document.querySelector('.bottom-sheet.active');
+        if (openSheetEl) {
+          closeSheet();
+        }
+      }
+    });
+
+    // Lifecycle handlers — persist state on app close / background
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') {
+        DB.save();
+      }
+    });
+
+    window.addEventListener('pagehide', function() {
+      DB.save();
+    });
+
+    trySupabaseInit();
+  }
+
+  async function trySupabaseInit() {
+    const result = await Supa.init(SUPABASE_URL, SUPABASE_KEY);
+    if (result.success) {
+      showSupabaseStatus('Connected to Supabase', 'success');
+      Promise.all([
+        Supa.syncDays(),
+        Supa.syncTasks(),
+        Supa.syncSessions(),
+        Supa.syncPersonalTasks(),
+        Supa.syncQuestionAnalytics(),
+      ]).then(() => {
+        renderHome();
+        renderPlan();
+        renderBacklog();
+        renderProgress();
+        renderPersonal();
+      }).catch(err => {
+        console.warn('[Supa] sync render failed:', err);
+      });
+    } else {
+      showSupabaseStatus('Supabase offline — data saved locally', 'info');
+    }
+  }
+
+  // ─── Public API ────────────────────────────────────────────────────────
+  
+  return {
+    init,
+    switchTab,
+    toggleDayCard,
+    openAddTask,
+    selectSubject,
+    saveTask,
+    saveDay,
+    toggleTask,
+    deleteTask,
+    deleteDay,
+    toggleEditTask,
+    toggleEditDay,
+    startSession,
+    startSessionWithMode,
+    startSessionFlow,
+    pauseSession,
+    endSession,
+    openReassign,
+    reassignTask,
+    toggleSetting,
+    setTheme,
+    saveSupabaseConfig,
+    clearData,
+    handleInstall,
+    closeSheet,
+    closeSummary,
+    addPersonalTask,
+    togglePersonalTask,
+    deletePersonalTask,
+    toggleCSVDay,
+    toggleCSVTask,
+    updateCSVDayDate,
+    confirmCSVImport,
+    nextQuestion,
+    skipQuestion,
+    toggleSubjectAnalytics,
+  };
+
+})();
+
+// ─── Boot ──────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', App.init);
