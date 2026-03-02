@@ -2235,7 +2235,7 @@ const App = (() => {
       await Supa.insertDay(day);
       addedDays++;
 
-      const stepNum = Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1);
+      const stepNum = totalDays > 0 ? Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1) : 1;
       setCsvStep(stepNum);
       document.getElementById('csvStatus').textContent = `Adding day ${addedDays} of ${totalDays}…`;
 

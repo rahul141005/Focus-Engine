@@ -1745,8 +1745,7 @@ input, textarea, select { font-family: var(--font-body); }
   animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
 
-.bottom-sheet.active { display: block; }
-.bottom-sheet.closing { display: block; }
+.bottom-sheet.active, .bottom-sheet.closing { display: block; }
 
 @keyframes slideUp {
   from { transform: translateX(-50%) translateY(100%); }
@@ -2502,10 +2501,23 @@ input, textarea, select { font-family: var(--font-body); }
 
 /* ─── Reduced motion support ───────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .tab-panel,
+  .subject-card,
+  .pending-item,
+  .task-check.done,
+  .day-card.expanded .day-tasks,
+  .session-summary-overlay.active,
+  .empty-state,
+  .toast,
+  .bottom-sheet {
+    animation: none;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .nav-item,
+  .subject-card,
+  .task-item {
+    transition-duration: 0.01ms;
   }
 }
 
