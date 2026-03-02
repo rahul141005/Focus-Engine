@@ -79,9 +79,10 @@ export async function saveEditNote() {
     await Firebase.updateDoc('sessionNotes', id, { text: note.text, topic: note.topic, sub_topic: note.sub_topic || null, subject: note.subject });
   } catch (err) {
     console.error('[FE] Note update failed:', err);
+  } finally {
+    _savingEditNote = false;
   }
 
-  _savingEditNote = false;
   closeNoteModal();
   renderPersonal();
   toast('Note updated', 'success');

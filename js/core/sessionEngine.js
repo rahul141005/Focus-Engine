@@ -6,6 +6,8 @@
 import { state, session } from '../core/appState.js';
 import { SUBJECT_COLORS, MIN_SESSION_SECONDS } from '../config/constants.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
+
+const MODE_SWITCH_COOLDOWN_MS = 300;
 import { fmtTime, fmtMins, esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
 import { FireDB } from '../services/databaseService.js';
@@ -222,10 +224,18 @@ export function switchSessionMode() {
   updateModeSegmentedControl(session.mode);
   _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
   // Prevent rapid switching — re-enable after short delay
-  setTimeout(() => { _switchingMode = false; }, 300);
+  setTimeout(() => { _switchingMode = false; }, MODE_SWITCH_COOLDOWN_MS);
 }
 
 let _endingSession = false;
+
+function _resetEndSessionButtons() {
+  const endBtn = document.getElementById('btnEndSession');
+  const pauseBtn = document.getElementById('btnPauseSession');
+  if (endBtn) endBtn.disabled = false;
+  if (pauseBtn) pauseBtn.disabled = false;
+  _endingSession = false;
+}
 
 export async function endSession() {
   if (!session.active || _endingSession) return;
@@ -276,9 +286,7 @@ export async function endSession() {
     session.topic = '';
     session.pausedAt = null;
     session.currentQuestionStart = null;
-    if (endBtn) endBtn.disabled = false;
-    if (pauseBtn) pauseBtn.disabled = false;
-    _endingSession = false;
+    _resetEndSessionButtons();
     _ui.toast('Session too short (< 2 min) — not saved', 'warning');
     return;
   }
@@ -358,8 +366,5 @@ export async function endSession() {
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   if (state.settings.sound) playEndTone();
 
-  // Re-enable buttons
-  if (endBtn) endBtn.disabled = false;
-  if (pauseBtn) pauseBtn.disabled = false;
-  _endingSession = false;
+  _resetEndSessionButtons();
 }
