@@ -15,7 +15,7 @@ export function renderNoteCard(note, sessionMap, qaMap) {
   // Find matching session for duration via Map lookup (O(1))
   const session = note.sessionId ? sessionMap.get(note.sessionId) : null;
   const durationLabel = session ? fmtTime(session.duration_seconds) : '';
-  const subTopicLabel = note.sub_topic || note.subNote || (session && (session.sub_topic || session.subNote)) || '';
+  const subTopicLabel = note.sub_topic || (session && session.sub_topic) || '';
 
   // Question breakdown via Map lookup (O(1))
   const qaRecord = note.sessionId ? qaMap.get(note.sessionId) : null;

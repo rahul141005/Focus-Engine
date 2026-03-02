@@ -101,7 +101,7 @@ export function startSessionFlow() {
           ${remainMins > 0 && completedMins > 0 ? `<span>Left: ${fmtMins(remainMins)}</span>` : ''}
         </div>
         ${lastInfo ? `<div class="pick-last">${lastInfo}</div>` : ''}
-        ${day && day.date !== today ? `<div style="font-size:11px;color:var(--text-3)">From ${esc(day.label)}</div>` : ''}
+        ${day && day.date !== today ? `<div class="pick-last">From ${esc(day.label)}</div>` : ''}
       </div>
       <div class="pick-time">${fmtMins(estMins)}</div>
     </div>`;
@@ -193,8 +193,11 @@ export function pauseSession() {
   }
 }
 
+let _switchingMode = false;
+
 export function switchSessionMode() {
-  if (!session.active) return;
+  if (!session.active || _switchingMode) return;
+  _switchingMode = true;
 
   const pqPanel = document.getElementById('perQuestionPanel');
 
@@ -218,16 +221,23 @@ export function switchSessionMode() {
 
   updateModeSegmentedControl(session.mode);
   _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
+  // Prevent rapid switching — re-enable after short delay
+  setTimeout(() => { _switchingMode = false; }, 300);
 }
 
+let _endingSession = false;
+
 export async function endSession() {
-  if (!session.active) return;
+  if (!session.active || _endingSession) return;
+  _endingSession = true;
   session.active = false;
   stopSessionTimer();
 
-  // Disable end session button to prevent double submission
+  // Disable session buttons to prevent double submission
   const endBtn = document.getElementById('btnEndSession');
+  const pauseBtn = document.getElementById('btnPauseSession');
   if (endBtn) endBtn.disabled = true;
+  if (pauseBtn) pauseBtn.disabled = true;
 
   if (session.paused) {
     const pausedDuration = Date.now() - session.pausedAt;
@@ -267,6 +277,8 @@ export async function endSession() {
     session.pausedAt = null;
     session.currentQuestionStart = null;
     if (endBtn) endBtn.disabled = false;
+    if (pauseBtn) pauseBtn.disabled = false;
+    _endingSession = false;
     _ui.toast('Session too short (< 2 min) — not saved', 'warning');
     return;
   }
@@ -289,7 +301,6 @@ export async function endSession() {
     const sesMins = Math.floor(finalElapsed / 60);
     if (sesMins >= (task.estimated_minutes || 0) * 0.8) {
       task.status = 'completed';
-      await FireDB.updateTask(task.id, { status: 'completed' });
     }
   }
 
@@ -310,9 +321,19 @@ export async function endSession() {
   }
 
   DB.save();
-  await FireDB.insertSession(record);
-  if (qaRecord) {
-    await FireDB.insertQuestionAnalytics(qaRecord);
+
+  // Firestore writes — non-blocking, errors logged but don't break session end
+  try {
+    const firebasePromises = [FireDB.insertSession(record)];
+    if (task && task.status === 'completed') {
+      firebasePromises.push(FireDB.updateTask(task.id, { status: 'completed' }));
+    }
+    if (qaRecord) {
+      firebasePromises.push(FireDB.insertQuestionAnalytics(qaRecord));
+    }
+    await Promise.all(firebasePromises);
+  } catch (err) {
+    console.error('[FE] endSession Firebase write failed:', err);
   }
 
   const summaryQuestions = session.questions.filter(q => q !== undefined);
@@ -337,6 +358,8 @@ export async function endSession() {
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   if (state.settings.sound) playEndTone();
 
-  // Re-enable end session button
+  // Re-enable buttons
   if (endBtn) endBtn.disabled = false;
+  if (pauseBtn) pauseBtn.disabled = false;
+  _endingSession = false;
 }

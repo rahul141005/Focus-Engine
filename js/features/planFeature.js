@@ -56,7 +56,11 @@ export async function saveTask() {
 
   state.tasks.push(task);
   DB.save();
-  await FireDB.insertTask(task);
+  try {
+    await FireDB.insertTask(task);
+  } catch (err) {
+    console.error('[FE] Task insert to Firebase failed:', err);
+  }
   _savingTask = false;
   closeSheet();
   renderPlan();
@@ -163,7 +167,11 @@ export async function saveDay() {
   const day = { id: uid(), label, date: date || null, created_at: new Date().toISOString() };
   state.days.push(day);
   DB.save();
-  await FireDB.insertDay(day);
+  try {
+    await FireDB.insertDay(day);
+  } catch (err) {
+    console.error('[FE] Day insert to Firebase failed:', err);
+  }
   _savingDay = false;
   closeSheet();
   renderPlan();
@@ -371,7 +379,7 @@ export async function handleCSVImport(file) {
     showCSVSelectionUI(dayGroups);
 
   } catch (err) {
-    console.error('CSV import error:', err);
+    console.error('[CSV] Import error:', err);
     proc.classList.remove('active');
     toast('Import failed — check file format', 'error');
   }

@@ -2829,3 +2829,31 @@ input, textarea, select { font-family: var(--font-body); }
   font-size: 11px;
   font-weight: 400;
 }
+
+/* ─── Sub-topic in backlog items ───────────── */
+.pending-sub-topic {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+/* ─── Sub-topic in CSV preview ─────────────── */
+.csv-task-subtopic {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ─── Backlog pending actions column ───────── */
+.pending-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* ─── Backlog empty message ────────────────── */
+.backlog-empty-msg {
+  padding: 16px;
+  color: var(--text-3);
+  font-size: 13px;
+}
