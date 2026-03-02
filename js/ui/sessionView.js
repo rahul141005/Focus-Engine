@@ -74,19 +74,25 @@ export function closeSummary() {
     appLocals.savingNotes = true;
     const doneBtn = overlay.querySelector('.btn-primary');
     if (doneBtn) doneBtn.disabled = true;
-    state.sessionNotes.push({
-      id: uid(),
-      sessionId: appLocals.lastSessionRecord.id,
-      subject: appLocals.lastSessionRecord.subject,
-      topic: appLocals.lastSessionRecord.topic,
-      text: notesInput.value.trim(),
-      date: todayStr(),
-      created_at: new Date().toISOString(),
-    });
-    DB.save();
-    toast('Note saved', 'success');
-    if (doneBtn) doneBtn.disabled = false;
-    appLocals.savingNotes = false;
+    try {
+      state.sessionNotes.push({
+        id: uid(),
+        sessionId: appLocals.lastSessionRecord.id,
+        subject: appLocals.lastSessionRecord.subject,
+        topic: appLocals.lastSessionRecord.topic,
+        text: notesInput.value.trim(),
+        date: todayStr(),
+        created_at: new Date().toISOString(),
+      });
+      DB.save();
+      toast('Note saved', 'success');
+    } catch (err) {
+      console.error('[FE] Note save failed:', err);
+      toast('Failed to save note', 'error');
+    } finally {
+      if (doneBtn) doneBtn.disabled = false;
+      appLocals.savingNotes = false;
+    }
   }
   appLocals.lastSessionRecord = null;
   overlay.classList.remove('active');

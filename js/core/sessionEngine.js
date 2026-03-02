@@ -9,12 +9,22 @@ import { uid, todayStr } from '../utils/timeUtils.js';
 import { fmtTime, fmtMins, esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
 import { Supa } from '../services/databaseService.js';
-import { toast } from '../ui/toastController.js';
-import { openSheet, closeSheet } from '../ui/modalController.js';
-import { renderHome, renderBacklog } from '../ui/renderEngine.js';
-import { renderProgress } from '../features/progressFeature.js';
-import { showSessionSummary } from '../ui/sessionView.js';
 import { startSessionTimer, stopSessionTimer } from './timerEngine.js';
+
+// ─── UI callbacks injected by bootstrap (avoids core→ui dependency) ────
+const _ui = {
+  toast: () => {},
+  openSheet: () => {},
+  closeSheet: () => {},
+  renderHome: () => {},
+  renderBacklog: () => {},
+  renderProgress: () => {},
+  showSessionSummary: () => {},
+};
+
+export function registerSessionUI(callbacks) {
+  Object.assign(_ui, callbacks);
+}
 
 function playEndTone() {
   try {
@@ -31,7 +41,7 @@ function playEndTone() {
 
 export function startSessionFlow() {
   if (session.active) {
-    toast('A session is already running', '');
+    _ui.toast('A session is already running', '');
     return;
   }
   const today = todayStr();
@@ -49,7 +59,7 @@ export function startSessionFlow() {
   const allAvailable = [...pending, ...backlog];
 
   if (allAvailable.length === 0) {
-    toast('No pending tasks — great job!', 'success');
+    _ui.toast('No pending tasks — great job!', 'success');
     return;
   }
 
@@ -85,27 +95,27 @@ export function startSessionFlow() {
       <div class="pick-time">${fmtMins(estMins)}</div>
     </div>`;
   }).join('');
-  openSheet('sheetSessionPicker');
+  _ui.openSheet('sheetSessionPicker');
 }
 
 export function startSession(taskId) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task) return;
 
-  closeSheet();
+  _ui.closeSheet();
 
   session.taskId    = taskId;
   session.subject   = task.subject;
   session.topic     = task.topic;
 
-  openSheet('sheetSessionMode');
+  _ui.openSheet('sheetSessionMode');
 }
 
 export function startSessionWithMode(mode) {
   const task = state.tasks.find(t => t.id === session.taskId);
   if (!task) return;
 
-  closeSheet();
+  _ui.closeSheet();
 
   session.active    = true;
   session.paused    = false;
@@ -190,11 +200,12 @@ export function switchSessionMode() {
   }
 
   if (modeBtn) modeBtn.textContent = session.mode === 'full' ? 'Timed Q' : 'Full';
-  toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
+  _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
 }
 
 export function endSession() {
   if (!session.active) return;
+  session.active = false; // immediately mark inactive to prevent double-end
   stopSessionTimer();
 
   if (session.paused) {
@@ -229,7 +240,7 @@ export function endSession() {
     session.questionIndex = 0;
     session.questionElapsed = 0;
     session.mode = 'full';
-    toast('Session too short (< 2 min) — not saved', 'warning');
+    _ui.toast('Session too short (< 2 min) — not saved', 'warning');
     return;
   }
 
@@ -283,11 +294,11 @@ export function endSession() {
   session.questionElapsed = 0;
   session.mode = 'full';
 
-  renderHome();
-  renderProgress();
-  renderBacklog();
+  _ui.renderHome();
+  _ui.renderProgress();
+  _ui.renderBacklog();
 
-  showSessionSummary(record, summaryQuestions, summaryMode);
+  _ui.showSessionSummary(record, summaryQuestions, summaryMode);
 
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   if (state.settings.sound) playEndTone();

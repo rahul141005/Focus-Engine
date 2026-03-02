@@ -6,7 +6,13 @@ import { state } from '../core/appState.js';
 import { VAPID_PUBLIC_KEY } from '../config/routes.js';
 import { DB } from '../services/storageService.js';
 import { Supa } from '../services/databaseService.js';
-import { toast } from '../ui/toastController.js';
+
+// ─── UI callback injected by bootstrap (avoids services→ui dependency) ─
+let _toast = () => {};
+
+export function registerAnalyticsUI(toastFn) {
+  _toast = toastFn;
+}
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -21,7 +27,7 @@ function urlBase64ToUint8Array(base64String) {
 
 export async function requestNotificationPermission() {
   if (!('Notification' in window)) {
-    toast('Notifications not supported', 'error');
+    _toast('Notifications not supported', 'error');
     return false;
   }
 
@@ -35,7 +41,7 @@ export async function subscribeToPushNotifications() {
   try {
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
-      toast('Notification permission denied', 'error');
+      _toast('Notification permission denied', 'error');
       return { success: false, error: 'Permission denied' };
     }
 

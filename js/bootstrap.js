@@ -9,7 +9,6 @@ import { QUOTES } from './config/constants.js';
 import { todayStr } from './utils/timeUtils.js';
 import { DB } from './services/storageService.js';
 import { Supa } from './services/databaseService.js';
-import { subscribeToPushNotifications } from './services/analyticsService.js';
 import { toast } from './ui/toastController.js';
 import { openSheet, closeSheet } from './ui/modalController.js';
 import {
@@ -20,11 +19,12 @@ import {
 import { renderProgress } from './features/progressFeature.js';
 import { renderPersonal, addPersonalTask, togglePersonalTask, deletePersonalTask } from './features/notesFeature.js';
 import { switchTab } from './ui/tabsController.js';
-import { closeSummary } from './ui/sessionView.js';
+import { closeSummary, showSessionSummary } from './ui/sessionView.js';
 import { startClock, updateClock } from './core/timerEngine.js';
 import {
   startSessionFlow, startSession, startSessionWithMode,
   pauseSession, endSession, switchSessionMode,
+  registerSessionUI,
 } from './core/sessionEngine.js';
 import { nextQuestion, skipQuestion, prevQuestion } from './core/questionEngine.js';
 import {
@@ -36,6 +36,7 @@ import {
 import {
   setBacklogSort, openReassign, reassignTask, undoReschedule,
 } from './features/backlogFeature.js';
+import { subscribeToPushNotifications, registerAnalyticsUI } from './services/analyticsService.js';
 
 // ─── Motivational Quote Engine ─────────────────────────────────────────
 
@@ -170,7 +171,24 @@ async function trySupabaseInit() {
 
 // ─── Init ──────────────────────────────────────────────────────────────
 
+let _initialized = false;
+
 export function init() {
+  if (_initialized) return; // prevent double initialization
+  _initialized = true;
+
+  // Wire up UI callbacks for core/services layer (avoids layer violations)
+  registerSessionUI({
+    toast,
+    openSheet,
+    closeSheet,
+    renderHome,
+    renderBacklog,
+    renderProgress,
+    showSessionSummary,
+  });
+  registerAnalyticsUI(toast);
+
   DB.load();
 
   if (state.settings.theme) {

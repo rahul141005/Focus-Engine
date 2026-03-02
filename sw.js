@@ -4,13 +4,36 @@
  * Implements: Offline caching, Push notifications, Background sync
  */
 
-const CACHE_VERSION  = 'focus-engine-v1.4';
+const CACHE_VERSION  = 'focus-engine-v2';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/js/main.js',
+  '/js/bootstrap.js',
+  '/js/config/constants.js',
+  '/js/config/routes.js',
+  '/js/core/appState.js',
+  '/js/core/timerEngine.js',
+  '/js/core/sessionEngine.js',
+  '/js/core/questionEngine.js',
+  '/js/services/storageService.js',
+  '/js/services/databaseService.js',
+  '/js/services/analyticsService.js',
+  '/js/ui/renderEngine.js',
+  '/js/ui/sessionView.js',
+  '/js/ui/tabsController.js',
+  '/js/ui/modalController.js',
+  '/js/ui/toastController.js',
+  '/js/features/notesFeature.js',
+  '/js/features/progressFeature.js',
+  '/js/features/backlogFeature.js',
+  '/js/features/planFeature.js',
+  '/js/utils/timeUtils.js',
+  '/js/utils/formatUtils.js',
+  '/js/utils/debounce.js',
   'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Sora:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js',
 ];
