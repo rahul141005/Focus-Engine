@@ -2235,7 +2235,7 @@ const App = (() => {
       };
 
       state.days.push(day);
-      Supa.insertDay(day);
+      Supa.insertDay(day).catch(e => console.warn('[Supa] day insert failed:', e));
       addedDays++;
 
       const stepNum = totalDays > 0 ? Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1) : 1;
@@ -2253,7 +2253,7 @@ const App = (() => {
           created_at: new Date().toISOString()
         };
         state.tasks.push(task);
-        Supa.insertTask(task);
+        Supa.insertTask(task).catch(e => console.warn('[Supa] task insert failed:', e));
         addedTasks++;
       }
     }
