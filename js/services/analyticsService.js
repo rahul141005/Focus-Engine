@@ -66,6 +66,7 @@ export async function subscribeToPushNotifications() {
             new Notification(title, {
               body,
               icon: '/icons/icon-192.png',
+              // badge omitted: not supported in foreground Notification() constructor
             });
           }
         });
