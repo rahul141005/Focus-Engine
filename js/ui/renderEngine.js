@@ -362,14 +362,14 @@ export function renderCSVSelectionList(dayGroups) {
         ${tasks.map((row, idx) => {
           const color = SUBJECT_COLORS[row.subject.trim()] || SUBJECT_COLORS.Other;
           const taskChecked = sel.tasks[idx];
-          const subNote = (row.subnote || row.sub_note || '').trim();
+          const subTopic = (row.sub_topic || row['sub-topic'] || row.subtopic || row.subnote || row.sub_note || '').trim() || null;
           return `<div class="csv-task-item" data-task-idx="${dayIdx}-${idx}">
             <div class="csv-task-check ${taskChecked ? 'checked' : ''}" data-task-check="${dayIdx}-${idx}" onclick="App.toggleCSVTask(${dayIdx},${idx})">
               ${taskChecked ? checkSvg10 : ''}
             </div>
             <div class="csv-task-info">
               <div class="csv-task-subj" style="color:${color}">${esc(row.subject.trim())}</div>
-              <div class="csv-task-topic">${esc(row.topic.trim())}${subNote ? ` <span style="color:var(--text-3);font-size:12px">· ${esc(subNote)}</span>` : ''}</div>
+              <div class="csv-task-topic">${esc(row.topic.trim())}${subTopic ? ` <span style="color:var(--text-3);font-size:12px">· ${esc(subTopic)}</span>` : ''}</div>
             </div>
             <div class="csv-task-mins">${parseInt(row.estimated_minutes) || 0}m</div>
           </div>`;

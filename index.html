@@ -498,7 +498,7 @@
     <div class="session-label">Focus Session</div>
     <div class="session-subject" id="sessionSubject">—</div>
     <div class="session-topic" id="sessionTopic">—</div>
-    <div class="session-sub-note" id="sessionSubNote" style="display:none"></div>
+    <div class="session-sub-topic" id="sessionSubTopic" style="display:none"></div>
     <div class="mode-toggle-wrapper">
       <button class="btn-mode-switch" id="btnSwitchMode">Timed Q</button>
     </div>
@@ -608,10 +608,6 @@
 <div class="bottom-sheet" id="sheetSessionMode">
   <div class="sheet-handle"></div>
   <div class="sheet-title">Choose Session Mode</div>
-  <div class="form-group" style="padding:0 16px 8px;">
-    <label class="form-label">Sub-note (optional)</label>
-    <input class="form-input" id="sessionSubNoteInput" placeholder="e.g., Speed Drill, Concept Revision..." maxlength="60">
-  </div>
   <div style="padding:0 16px;display:flex;flex-direction:column;gap:8px;">
     <div class="session-pick-item" onclick="App.startSessionWithMode('full')">
       <div class="pick-dot" style="background:var(--indigo)"></div>
@@ -672,8 +668,8 @@
     <input class="form-input" id="editNoteTopic" placeholder="Topic">
   </div>
   <div class="form-group">
-    <label class="form-label">Sub-note</label>
-    <input class="form-input" id="editNoteSubNote" placeholder="e.g., Speed Drill, Concept Revision...">
+    <label class="form-label">Sub-topic</label>
+    <input class="form-input" id="editNoteSubTopic" placeholder="" readonly style="opacity:0.6;cursor:default">
   </div>
   <div class="form-group">
     <label class="form-label">Note</label>

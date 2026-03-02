@@ -2357,7 +2357,7 @@ input, textarea, select { font-family: var(--font-body); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.note-card-subnote {
+.note-card-subtopic {
   color: var(--text-3);
   font-weight: 400;
 }
@@ -2496,8 +2496,8 @@ input, textarea, select { font-family: var(--font-body); }
   opacity: 1;
 }
 
-/* Sub-note display in session overlay */
-.session-sub-note {
+/* Sub-topic display in session overlay */
+.session-sub-topic {
   font-size: 12px;
   color: rgba(255,255,255,0.5);
   margin-top: 2px;

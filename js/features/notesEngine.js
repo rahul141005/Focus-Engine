@@ -26,13 +26,13 @@ export function openEditNote(id) {
   const input = document.getElementById('editNoteText');
   const subjectEl = document.getElementById('editNoteSubject');
   const topicEl = document.getElementById('editNoteTopic');
-  const subNoteEl = document.getElementById('editNoteSubNote');
+  const subTopicEl = document.getElementById('editNoteSubTopic');
   const hiddenId = document.getElementById('editNoteId');
 
   if (input) input.value = note.text;
   if (subjectEl) subjectEl.value = note.subject || '';
   if (topicEl) topicEl.value = note.topic || '';
-  if (subNoteEl) subNoteEl.value = note.subNote || '';
+  if (subTopicEl) subTopicEl.value = note.sub_topic || note.subNote || '';
   if (hiddenId) hiddenId.value = note.id;
 
   document.getElementById('sheetBackdrop').classList.add('active');
@@ -56,8 +56,6 @@ export async function saveEditNote() {
   const id = document.getElementById('editNoteId').value;
   const text = document.getElementById('editNoteText').value.trim();
   const topic = document.getElementById('editNoteTopic').value.trim();
-  const subNoteEl = document.getElementById('editNoteSubNote');
-  const subNote = subNoteEl ? subNoteEl.value.trim() : '';
 
   if (!id || !text) {
     toast('Note text cannot be empty');
@@ -69,10 +67,10 @@ export async function saveEditNote() {
 
   note.text = text;
   note.topic = topic;
-  note.subNote = subNote;
+  // sub_topic is NOT editable — preserved from session
 
   DB.save();
-  await Firebase.updateDoc('sessionNotes', id, { text: note.text, topic: note.topic, subNote: note.subNote, subject: note.subject });
+  await Firebase.updateDoc('sessionNotes', id, { text: note.text, topic: note.topic, sub_topic: note.sub_topic || null, subject: note.subject });
 
   closeNoteModal();
   renderPersonal();

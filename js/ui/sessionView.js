@@ -26,11 +26,11 @@ export function showSessionSummary(record, questions, mode) {
       <div class="summary-stat-label">Subject</div>
     </div>`;
 
-  if (record.subNote) {
+  if (record.sub_topic) {
     statsHtml += `
     <div class="summary-stat-card">
       <div class="summary-stat-value" style="font-size:14px">${record.topic}</div>
-      <div class="summary-stat-label">${record.subNote}</div>
+      <div class="summary-stat-label">${record.sub_topic}</div>
     </div>`;
   }
 
@@ -87,7 +87,7 @@ export async function closeSummary() {
         sessionId: appLocals.lastSessionRecord.id,
         subject: appLocals.lastSessionRecord.subject,
         topic: appLocals.lastSessionRecord.topic,
-        subNote: appLocals.lastSessionRecord.subNote || '',
+        sub_topic: appLocals.lastSessionRecord.sub_topic || null,
         text: notesInput.value.trim(),
         date: todayStr(),
         created_at: new Date().toISOString(),

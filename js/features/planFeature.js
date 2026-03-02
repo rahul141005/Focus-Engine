@@ -46,7 +46,7 @@ export async function saveTask() {
 
   const task = {
     id: uid(), day_id: state.currentDayId,
-    subject: subj, topic, estimated_minutes: mins,
+    subject: subj, topic, sub_topic: null, estimated_minutes: mins,
     status: 'pending', created_at: new Date().toISOString()
   };
 
@@ -247,6 +247,20 @@ function setCsvStep(stepNum) {
   }
 }
 
+// ─── CSV Import Helpers ────────────────────────────────────────────────
+
+function resolveSubTopic(row) {
+  // Map various header names to sub_topic (case-insensitive via transformHeader)
+  const raw = row.sub_topic || row['sub-topic'] || row.subtopic || row.subnote || row.sub_note || '';
+  const val = typeof raw === 'string' ? raw.trim() : '';
+  return val || null;
+}
+
+function sanitizeString(val) {
+  if (typeof val !== 'string') return '';
+  return val.replace(/[<>"'&]/g, '').trim();
+}
+
 export async function handleCSVImport(file) {
   if (!file || !file.name.toLowerCase().endsWith('.csv')) {
     toast('Please select a valid CSV file', 'error');
@@ -271,7 +285,7 @@ export async function handleCSVImport(file) {
     const parsed = Papa.parse(text, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: h => h.trim().toLowerCase().replace(/\s+/g, '_')
+      transformHeader: h => h.trim().toLowerCase().replace(/[\s-]+/g, '_')
     });
 
     if (parsed.errors.length > 0) {
@@ -280,15 +294,15 @@ export async function handleCSVImport(file) {
       return;
     }
 
-    const rows = parsed.data;
-    if (rows.length === 0) {
+    const allRows = parsed.data;
+    if (allRows.length === 0) {
       proc.classList.remove('active');
       toast('CSV file is empty', 'error');
       return;
     }
 
     const requiredCols = ['day', 'subject', 'topic', 'estimated_minutes'];
-    const firstRow = rows[0];
+    const firstRow = allRows[0];
     const missing = requiredCols.filter(col => !(col in firstRow));
 
     if (missing.length > 0) {
@@ -300,36 +314,47 @@ export async function handleCSVImport(file) {
     document.getElementById('csvStatus').textContent = 'Validating rows…';
     setCsvStep(3);
 
-    const errors = [];
-    rows.forEach((row, idx) => {
+    const validRows = [];
+    let skippedCount = 0;
+
+    allRows.forEach((row, idx) => {
       if (!row.day || !row.subject || !row.topic) {
-        errors.push(`Row ${idx + 2}: Missing required field`);
+        console.warn(`[CSV] Row ${idx + 2}: Missing required field — skipped`);
+        skippedCount++;
+        return;
       }
       const mins = parseInt(row.estimated_minutes);
       if (isNaN(mins) || mins <= 0) {
-        errors.push(`Row ${idx + 2}: Invalid estimated_minutes`);
+        console.warn(`[CSV] Row ${idx + 2}: Invalid estimated_minutes — skipped`);
+        skippedCount++;
+        return;
       }
+      validRows.push(row);
     });
 
-    if (errors.length > 0) {
+    if (validRows.length === 0) {
       proc.classList.remove('active');
-      const detail = errors[0] + (errors.length > 1 ? ` (+${errors.length - 1} more)` : '');
-      toast(detail, 'error');
-      console.error('CSV errors:', errors);
+      toast(`All ${allRows.length} rows invalid — check CSV format`, 'error');
       return;
+    }
+
+    if (skippedCount > 0) {
+      console.warn(`[CSV] ${skippedCount} malformed rows skipped, ${validRows.length} valid`);
     }
 
     document.getElementById('csvStatus').textContent = 'Preparing preview…';
     setCsvStep(4);
 
     const dayGroups = {};
-    rows.forEach(row => {
+    validRows.forEach(row => {
       const dayKey = row.day.trim();
       if (!dayGroups[dayKey]) dayGroups[dayKey] = [];
       dayGroups[dayKey].push(row);
     });
 
     appLocals.csvParsedData = dayGroups;
+    appLocals.csvSkippedCount = skippedCount;
+    appLocals.csvTotalRows = allRows.length;
     proc.classList.remove('active');
     showCSVSelectionUI(dayGroups);
 
@@ -400,8 +425,21 @@ export async function confirmCSVImport() {
   setCsvStep(1);
 
   const dayKeys = Object.keys(appLocals.csvParsedData);
-  let addedDays = 0, addedTasks = 0;
+  let addedDays = 0, addedTasks = 0, duplicateCount = 0;
   const totalDays = dayKeys.filter(k => appLocals.csvSelection[k] && appLocals.csvSelection[k].selected).length;
+
+  // Build existing task uniqueness set: day_id + subject + topic + sub_topic
+  const existingKeys = new Set();
+  state.tasks.forEach(t => {
+    const day = state.days.find(d => d.id === t.day_id);
+    if (day) {
+      const key = `${day.label}|${t.subject}|${t.topic}|${t.sub_topic || ''}`;
+      existingKeys.add(key.toLowerCase());
+    }
+  });
+
+  // Track keys added during this import to detect intra-import duplicates
+  const importKeys = new Set();
 
   for (const dayKey of dayKeys) {
     const sel = appLocals.csvSelection[dayKey];
@@ -436,12 +474,25 @@ export async function confirmCSVImport() {
     document.getElementById('csvStatus').textContent = `Adding day ${addedDays} of ${totalDays}…`;
 
     for (const row of selectedTasks) {
+      const subject = sanitizeString(row.subject);
+      const topic = sanitizeString(row.topic);
+      const sub_topic = resolveSubTopic(row);
+      const sanitizedSubTopic = sub_topic ? sanitizeString(sub_topic) : null;
+
+      // Duplicate detection: day + subject + topic + sub_topic
+      const uniqueKey = `${dayKey}|${subject}|${topic}|${sanitizedSubTopic || ''}`.toLowerCase();
+      if (existingKeys.has(uniqueKey) || importKeys.has(uniqueKey)) {
+        duplicateCount++;
+        continue;
+      }
+      importKeys.add(uniqueKey);
+
       const task = {
         id: uid(),
         day_id: day.id,
-        subject: row.subject.trim(),
-        topic: row.topic.trim(),
-        subNote: (row.subnote || row.sub_note || '').trim(),
+        subject,
+        topic,
+        sub_topic: sanitizedSubTopic,
         estimated_minutes: parseInt(row.estimated_minutes) || 0,
         status: 'pending',
         created_at: new Date().toISOString()
@@ -453,11 +504,19 @@ export async function confirmCSVImport() {
   }
 
   DB.save();
+
+  const skipped = appLocals.csvSkippedCount || 0;
   appLocals.csvParsedData = null;
   appLocals.csvSelection = {};
+  appLocals.csvSkippedCount = 0;
+  appLocals.csvTotalRows = 0;
   proc.classList.remove('active');
   closeSheet();
   renderPlan();
   renderHome();
-  toast(`Imported ${addedDays} days, ${addedTasks} tasks`, 'success');
+
+  let summary = `Imported ${addedDays} days, ${addedTasks} tasks`;
+  if (duplicateCount > 0) summary += `, ${duplicateCount} duplicates skipped`;
+  if (skipped > 0) summary += `, ${skipped} malformed rows skipped`;
+  toast(summary, 'success');
 }
