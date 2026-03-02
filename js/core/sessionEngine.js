@@ -264,9 +264,10 @@ export async function endSession() {
     }
   }
 
+  let qaRecord = null;
   if (session.mode === 'perQuestion' && session.questions.length > 0) {
     const validQuestions = session.questions.filter(q => q !== undefined);
-    const qaRecord = {
+    qaRecord = {
       id: uid(),
       sessionId: record.id,
       subject: session.subject,
@@ -276,12 +277,12 @@ export async function endSession() {
       created_at: new Date().toISOString(),
     };
     state.questionAnalytics.push(qaRecord);
-    DB.save();
-    await FireDB.insertSession(record);
+  }
+
+  DB.save();
+  await FireDB.insertSession(record);
+  if (qaRecord) {
     await FireDB.insertQuestionAnalytics(qaRecord);
-  } else {
-    DB.save();
-    await FireDB.insertSession(record);
   }
 
   const summaryQuestions = session.questions.filter(q => q !== undefined);
