@@ -4,8 +4,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { state, appLocals } from '../core/appState.js';
-import { SUBJECT_COLORS, QUOTES, MAX_DISPLAYED_NOTES, ENCOURAGEMENTS, CONSISTENCY_WEIGHT } from '../config/constants.js';
-import { fmtTime, fmtMins, fmtHHMM, esc } from '../utils/formatUtils.js';
+import { SUBJECT_COLORS } from '../config/constants.js';
+import { fmtMins, esc } from '../utils/formatUtils.js';
 import { todayStr, parseLocalDate } from '../utils/timeUtils.js';
 
 // ─── Home Rendering ────────────────────────────────────────────────────

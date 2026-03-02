@@ -36,7 +36,8 @@ function playEndTone() {
     gain.gain.setValueAtTime(0.15, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
     osc.start(); osc.stop(ctx.currentTime + 1.2);
-  } catch(e) {}
+    osc.onended = () => ctx.close();
+  } catch(e) { console.warn('[FE] playEndTone failed:', e); }
 }
 
 export function startSessionFlow() {
@@ -235,7 +236,6 @@ export function endSession() {
   } catch(e) {}
 
   if (finalElapsed < MIN_SESSION_SECONDS) {
-    session.active = false;
     session.questions = [];
     session.questionIndex = 0;
     session.questionElapsed = 0;
@@ -284,7 +284,6 @@ export function endSession() {
   const summaryQuestions = session.questions.filter(q => q !== undefined);
   const summaryMode = session.mode;
 
-  session.active = false;
   session.paused = false;
   session.taskId = null;
   session.pausedAt = null;

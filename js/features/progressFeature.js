@@ -4,7 +4,7 @@
 
 import { state } from '../core/appState.js';
 import { SUBJECT_COLORS, CONSISTENCY_WEIGHT, ENCOURAGEMENTS } from '../config/constants.js';
-import { fmtTime, fmtHHMM, esc } from '../utils/formatUtils.js';
+import { fmtTime, fmtHHMM } from '../utils/formatUtils.js';
 import { todayStr, parseLocalDate } from '../utils/timeUtils.js';
 
 export function renderProgress() {
