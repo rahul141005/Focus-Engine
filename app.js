@@ -1679,6 +1679,7 @@ const App = (() => {
       pqPanel.style.display = 'none';
     }
 
+    if (session.timerRef) { clearInterval(session.timerRef); }
     session.timerRef = setInterval(tickSession, 1000);
 
     // Request fullscreen
@@ -1937,10 +1938,16 @@ const App = (() => {
     overlay.classList.add('active');
   }
 
+  let savingNotes = false;
+
   function closeSummary() {
+    if (savingNotes) return;
     const overlay = document.getElementById('sessionSummaryOverlay');
     const notesInput = document.getElementById('summaryNotesInput');
-    if (notesInput && notesInput.value.trim() && lastSessionRecord) {
+    if (notesInput && notesInput.value.trim() && lastSessionRecord && lastSessionRecord.id) {
+      savingNotes = true;
+      const doneBtn = overlay.querySelector('.btn-primary');
+      if (doneBtn) doneBtn.disabled = true;
       state.sessionNotes.push({
         id: uid(),
         sessionId: lastSessionRecord.id,
@@ -1952,6 +1959,8 @@ const App = (() => {
       });
       DB.save();
       toast('Note saved', 'success');
+      if (doneBtn) doneBtn.disabled = false;
+      savingNotes = false;
     }
     lastSessionRecord = null;
     overlay.classList.remove('active');
@@ -1962,10 +1971,18 @@ const App = (() => {
     const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
     session.questions[session.questionIndex] = { number: session.questionIndex + 1, seconds: qTime, skipped: false };
     session.questionIndex++;
-    session.currentQuestionStart = Date.now();
-    session.questionElapsed = 0;
+
+    // Restore elapsed if this question was previously visited
+    const existingQ = session.questions[session.questionIndex];
+    if (existingQ && existingQ.seconds > 0) {
+      session.questionElapsed = existingQ.seconds;
+      session.currentQuestionStart = Date.now() - (existingQ.seconds * 1000);
+    } else {
+      session.currentQuestionStart = Date.now();
+      session.questionElapsed = 0;
+    }
     document.getElementById('questionNumber').textContent = session.questionIndex + 1;
-    document.getElementById('questionTimer').textContent = '00:00';
+    document.getElementById('questionTimer').textContent = fmtTime(session.questionElapsed);
   }
 
   function skipQuestion() {
@@ -1973,10 +1990,18 @@ const App = (() => {
     const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
     session.questions[session.questionIndex] = { number: session.questionIndex + 1, seconds: qTime, skipped: true };
     session.questionIndex++;
-    session.currentQuestionStart = Date.now();
-    session.questionElapsed = 0;
+
+    // Restore elapsed if this question was previously visited
+    const existingQ = session.questions[session.questionIndex];
+    if (existingQ && existingQ.seconds > 0) {
+      session.questionElapsed = existingQ.seconds;
+      session.currentQuestionStart = Date.now() - (existingQ.seconds * 1000);
+    } else {
+      session.currentQuestionStart = Date.now();
+      session.questionElapsed = 0;
+    }
     document.getElementById('questionNumber').textContent = session.questionIndex + 1;
-    document.getElementById('questionTimer').textContent = '00:00';
+    document.getElementById('questionTimer').textContent = fmtTime(session.questionElapsed);
   }
 
   function playEndTone() {
