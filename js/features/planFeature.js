@@ -21,6 +21,8 @@ export function openAddTask(dayId) {
   document.querySelectorAll('.subj-chip').forEach(c => c.classList.remove('active'));
   document.getElementById('inputTaskTopic').value = '';
   document.getElementById('inputTaskMins').value  = '';
+  const subTopicInput = document.getElementById('inputTaskSubTopic');
+  if (subTopicInput) subTopicInput.value = '';
   openSheet('sheetAddTask');
 }
 
@@ -38,6 +40,8 @@ export async function saveTask() {
   const subj  = state.selectedSubject;
   const topic = document.getElementById('inputTaskTopic').value.trim();
   const mins  = parseInt(document.getElementById('inputTaskMins').value) || 0;
+  const subTopicInput = document.getElementById('inputTaskSubTopic');
+  const subTopic = subTopicInput ? subTopicInput.value.trim() || null : null;
 
   if (!subj)  { toast('Pick a subject', 'error'); return; }
   if (!topic) { toast('Enter a topic', 'error');  return; }
@@ -46,7 +50,7 @@ export async function saveTask() {
 
   const task = {
     id: uid(), day_id: state.currentDayId,
-    subject: subj, topic, sub_topic: null, estimated_minutes: mins,
+    subject: subj, topic, sub_topic: subTopic, estimated_minutes: mins,
     status: 'pending', created_at: new Date().toISOString()
   };
 

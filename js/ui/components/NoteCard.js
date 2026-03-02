@@ -12,10 +12,9 @@ export function renderNoteCard(note, sessionMap, qaMap) {
     ? parseLocalDate(note.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : '';
 
-  // Find matching session for duration & mode via Map lookup (O(1))
+  // Find matching session for duration via Map lookup (O(1))
   const session = note.sessionId ? sessionMap.get(note.sessionId) : null;
   const durationLabel = session ? fmtTime(session.duration_seconds) : '';
-  const modeBadge = session && session.mode === 'perQuestion' ? 'Timed Q' : (session ? 'Full' : '');
   const subTopicLabel = note.sub_topic || note.subNote || (session && (session.sub_topic || session.subNote)) || '';
 
   // Question breakdown via Map lookup (O(1))
@@ -45,11 +44,11 @@ export function renderNoteCard(note, sessionMap, qaMap) {
     <div class="note-card-header" onclick="App.toggleNoteExpand('${note.id}')">
       <div class="note-card-meta">
         <div class="note-card-subject" style="color:${color}">${esc(note.subject)}</div>
-        <div class="note-card-topic">${esc(note.topic)}${subTopicLabel ? ` <span class="note-card-subtopic">· ${esc(subTopicLabel)}</span>` : ''}</div>
+        <div class="note-card-topic">${esc(note.topic)}</div>
+        ${subTopicLabel ? `<div class="note-card-subtopic">${esc(subTopicLabel)}</div>` : ''}
         <div class="note-card-meta-row">
           ${dateLabel ? `<span class="note-card-date">${dateLabel}</span>` : ''}
           ${durationLabel ? `<span class="note-card-duration">${durationLabel}</span>` : ''}
-          ${modeBadge ? `<span class="note-card-mode-badge">${modeBadge}</span>` : ''}
         </div>
       </div>
       <div class="note-card-actions" onclick="event.stopPropagation()">

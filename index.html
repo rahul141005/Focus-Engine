@@ -500,11 +500,14 @@
     <div class="session-topic" id="sessionTopic">—</div>
     <div class="session-sub-topic" id="sessionSubTopic" style="display:none"></div>
     <div class="mode-toggle-wrapper">
-      <button class="btn-mode-switch" id="btnSwitchMode">Timed Q</button>
+      <div class="segmented-control" id="segmentedModeControl">
+        <button class="seg-btn active" id="segModeFull" onclick="App.switchSessionMode()">Full</button>
+        <button class="seg-btn" id="segModeTimed" onclick="App.switchSessionMode()">Timed Q</button>
+      </div>
     </div>
   </div>
 
-  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+  <div class="session-timer-section">
     <div class="session-timer" id="sessionTimer">00:00</div>
     <div class="session-status" id="sessionStatus">RUNNING</div>
   </div>
@@ -581,6 +584,10 @@
   <div class="form-group">
     <label class="form-label">Topic</label>
     <input class="form-input" id="inputTaskTopic" placeholder="e.g., Ratio & Proportion">
+  </div>
+  <div class="form-group">
+    <label class="form-label form-label-sm">Sub-topic <span class="form-optional">(optional)</span></label>
+    <input class="form-input" id="inputTaskSubTopic" placeholder="Speed Drill / Revision / Mixed Practice">
   </div>
   <div class="form-row">
     <div class="form-group">

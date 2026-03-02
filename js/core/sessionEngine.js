@@ -85,6 +85,7 @@ export function startSessionFlow() {
       <div class="pick-info">
         <div class="pick-subj" style="color:${color}">${t.subject}</div>
         <div class="pick-topic">${esc(t.topic)}</div>
+        ${t.sub_topic ? `<div class="pick-sub-topic">${esc(t.sub_topic)}</div>` : ''}
         <div class="pick-meta">
           <span>Est: ${fmtMins(estMins)}</span>
           ${completedMins > 0 ? `<span>Done: ${fmtMins(completedMins)}</span>` : ''}
@@ -143,8 +144,13 @@ export function startSessionWithMode(mode) {
   document.getElementById('btnPauseSession').textContent = 'Pause';
   document.getElementById('sessionOverlay').classList.add('active');
 
-  const modeBtn = document.getElementById('btnSwitchMode');
-  if (modeBtn) modeBtn.textContent = mode === 'full' ? 'Timed Q' : 'Full';
+  // Update segmented mode control
+  const segFull = document.getElementById('segModeFull');
+  const segTimed = document.getElementById('segModeTimed');
+  if (segFull && segTimed) {
+    segFull.classList.toggle('active', mode === 'full');
+    segTimed.classList.toggle('active', mode === 'perQuestion');
+  }
 
   const pqPanel = document.getElementById('perQuestionPanel');
   if (mode === 'perQuestion') {
@@ -188,7 +194,6 @@ export function switchSessionMode() {
   if (!session.active) return;
 
   const pqPanel = document.getElementById('perQuestionPanel');
-  const modeBtn = document.getElementById('btnSwitchMode');
 
   if (session.mode === 'perQuestion') {
     if (!session.paused && session.currentQuestionStart) {
@@ -208,7 +213,13 @@ export function switchSessionMode() {
     document.getElementById('questionTimer').textContent = fmtTime(session.questionElapsed);
   }
 
-  if (modeBtn) modeBtn.textContent = session.mode === 'full' ? 'Timed Q' : 'Full';
+  // Update segmented mode control
+  const segFull2 = document.getElementById('segModeFull');
+  const segTimed2 = document.getElementById('segModeTimed');
+  if (segFull2 && segTimed2) {
+    segFull2.classList.toggle('active', session.mode === 'full');
+    segTimed2.classList.toggle('active', session.mode === 'perQuestion');
+  }
   _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
 }
 

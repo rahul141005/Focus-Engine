@@ -53,7 +53,11 @@ export function renderHome() {
 
   list.innerHTML = Object.entries(subjectMap).map(([subj, data]) => {
     const color = SUBJECT_COLORS[subj] || SUBJECT_COLORS.Other;
-    const topics = data.tasks.map(t => esc(t.topic)).join(', ');
+    const topics = data.tasks.map(t => {
+      let label = esc(t.topic);
+      if (t.sub_topic) label += ` <span class="subject-sub-topic">· ${esc(t.sub_topic)}</span>`;
+      return label;
+    }).join(', ');
     const remaining = data.total - data.done;
     const pct = data.total > 0 ? (data.done / data.total) * 100 : 0;
     const allDone = remaining <= 0;
@@ -92,6 +96,7 @@ export function renderTaskRow(task) {
     <div class="task-info">
       <div class="task-subject" style="color:${color}">${task.subject}</div>
       <div class="task-topic" contenteditable="false" data-field="topic">${esc(task.topic)}</div>
+      ${task.sub_topic ? `<div class="task-sub-topic">${esc(task.sub_topic)}</div>` : ''}
     </div>
     <div class="task-time" contenteditable="false" data-field="minutes">${fmtMins(task.estimated_minutes || 0)}</div>
     <div class="task-actions">
