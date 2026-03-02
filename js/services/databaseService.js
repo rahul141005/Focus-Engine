@@ -211,4 +211,16 @@ export const FireDB = {
       updated_at: new Date().toISOString(),
     });
   },
+
+  async deleteAllCollections() {
+    const collections = ['days', 'tasks', 'sessions', 'personalTasks', 'questionAnalytics', 'sessionNotes', 'pushTokens'];
+    const results = await Promise.all(
+      collections.map(c => Firebase.deleteCollection(c))
+    );
+    const failed = collections.filter((c, i) => !results[i].success);
+    if (failed.length > 0) {
+      return { success: false, error: `Failed to clear: ${failed.join(', ')}` };
+    }
+    return { success: true };
+  },
 };

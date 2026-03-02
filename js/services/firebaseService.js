@@ -126,4 +126,37 @@ export const Firebase = {
       return { success: false, error: err.message };
     }
   },
+
+  async deleteCollection(collectionName) {
+    if (!_db || !_firestore) return { success: false, error: 'Not connected' };
+    try {
+      const { collection, getDocs, doc, writeBatch } = _firestore;
+      const snapshot = await getDocs(collection(_db, collectionName));
+      if (snapshot.empty) return { success: true, deleted: 0 };
+
+      const BATCH_LIMIT = 400;
+      let deleted = 0;
+      let batch = writeBatch(_db);
+      let batchCount = 0;
+
+      for (const docSnap of snapshot.docs) {
+        batch.delete(doc(_db, collectionName, docSnap.id));
+        batchCount++;
+        if (batchCount >= BATCH_LIMIT) {
+          await batch.commit();
+          deleted += batchCount;
+          batch = writeBatch(_db);
+          batchCount = 0;
+        }
+      }
+      if (batchCount > 0) {
+        await batch.commit();
+        deleted += batchCount;
+      }
+      return { success: true, deleted };
+    } catch (err) {
+      console.error(`[Firebase] deleteCollection ${collectionName}:`, err);
+      return { success: false, error: err.message };
+    }
+  },
 };

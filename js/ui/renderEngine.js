@@ -55,9 +55,9 @@ export function renderHome() {
     const color = SUBJECT_COLORS[subj] || SUBJECT_COLORS.Other;
     const topics = data.tasks.map(t => {
       let label = esc(t.topic);
-      if (t.sub_topic) label += ` <span class="subject-sub-topic">· ${esc(t.sub_topic)}</span>`;
-      return label;
-    }).join(', ');
+      if (t.sub_topic) label += ` : <span class="subject-sub-topic">${esc(t.sub_topic)}</span>`;
+      return `<div class="subject-topic-line">${label}</div>`;
+    }).join('');
     const remaining = data.total - data.done;
     const pct = data.total > 0 ? (data.done / data.total) * 100 : 0;
     const allDone = remaining <= 0;

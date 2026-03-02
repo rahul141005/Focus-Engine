@@ -126,23 +126,74 @@ function handleInstall() {
   }
 }
 
-function clearData() {
+let _dataCleared = false;
+
+async function clearData() {
   if (!confirm('Clear all local data? This cannot be undone.')) return;
-  state.days = [];
-  state.tasks = [];
-  state.sessions = [];
-  state.personalTasks = [];
-  state.questionAnalytics = [];
-  state.sessionNotes = [];
-  state.questionNotes = [];
-  state.rescheduledTopics = [];
-  DB.save();
-  renderHome();
-  renderPlan();
-  renderBacklog();
-  renderProgress();
-  renderPersonal();
-  toast('Data cleared');
+
+  const btn = document.getElementById('btnClearData');
+  if (btn) btn.disabled = true;
+
+  _dataCleared = true;
+
+  try {
+    // 1. Clear Firestore collections
+    try {
+      await FireDB.deleteAllCollections();
+    } catch (err) {
+      console.error('[FE] Firestore clear failed:', err);
+    }
+
+    // 2. Clear in-memory state
+    state.days = [];
+    state.tasks = [];
+    state.sessions = [];
+    state.personalTasks = [];
+    state.questionAnalytics = [];
+    state.sessionNotes = [];
+    state.questionNotes = [];
+    state.rescheduledTopics = [];
+    state.pushSubscription = null;
+
+    // 3. Clear localStorage
+    localStorage.clear();
+
+    // 4. Clear IndexedDB (Firestore offline persistence cache)
+    try {
+      const dbs = await indexedDB.databases();
+      await Promise.all(
+        dbs.map(db => new Promise((resolve, reject) => {
+          const req = indexedDB.deleteDatabase(db.name);
+          req.onsuccess = resolve;
+          req.onerror = reject;
+          req.onblocked = resolve;
+        }))
+      );
+    } catch (err) {
+      console.warn('[FE] IndexedDB clear failed:', err);
+    }
+
+    // 5. Clear Service Worker caches
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    } catch (err) {
+      console.warn('[FE] Cache clear failed:', err);
+    }
+
+    // 6. Re-render all views
+    renderHome();
+    renderPlan();
+    renderBacklog();
+    renderProgress();
+    renderPersonal();
+    toast('All data cleared successfully', 'success');
+  } catch (err) {
+    console.error('[FE] Clear data error:', err);
+    toast('Error clearing data — please try again', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ─── Startup Error Display ─────────────────────────────────────────────
@@ -162,6 +213,8 @@ function showStartupError(phase, message) {
 // ─── Firebase Auto-Init ────────────────────────────────────────────────
 
 async function tryFirebaseInit() {
+  if (_dataCleared) return;
+
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -177,6 +230,7 @@ async function tryFirebaseInit() {
 
     if (result.success) {
       showCloudStatus('Connected to Firebase', 'success');
+      if (_dataCleared) return;
       try {
         await Promise.all([
           FireDB.syncDays(),
