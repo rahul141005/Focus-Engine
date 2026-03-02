@@ -1724,26 +1724,32 @@ const App = (() => {
 
   function switchSessionMode() {
     if (!session.active) return;
-    const wasPaused = session.paused;
-    if (!wasPaused) pauseSession();
 
-    session.mode = session.mode === 'full' ? 'perQuestion' : 'full';
     const pqPanel = document.getElementById('perQuestionPanel');
     const modeBtn = document.getElementById('btnSwitchMode');
 
     if (session.mode === 'perQuestion') {
-      pqPanel.style.display = '';
-      if (!session.currentQuestionStart) {
-        session.currentQuestionStart = session.pausedAt || Date.now();
+      // Switching perQuestion → Full: freeze question elapsed
+      if (!session.paused && session.currentQuestionStart) {
+        session.questionElapsed = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
       }
+      session.mode = 'full';
+      pqPanel.style.display = 'none';
+    } else {
+      // Switching Full → perQuestion: restore question timer from frozen elapsed
+      session.mode = 'perQuestion';
+      if (session.paused) {
+        // Set currentQuestionStart relative to pausedAt so resume adjustment works correctly
+        session.currentQuestionStart = session.pausedAt - (session.questionElapsed * 1000);
+      } else {
+        session.currentQuestionStart = Date.now() - (session.questionElapsed * 1000);
+      }
+      pqPanel.style.display = '';
       document.getElementById('questionNumber').textContent = session.questionIndex + 1;
       document.getElementById('questionTimer').textContent = fmtTime(session.questionElapsed);
-    } else {
-      pqPanel.style.display = 'none';
     }
-    if (modeBtn) modeBtn.textContent = session.mode === 'full' ? 'Timed Q' : 'Full';
 
-    if (!wasPaused) pauseSession();
+    if (modeBtn) modeBtn.textContent = session.mode === 'full' ? 'Timed Q' : 'Full';
     toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
   }
 
