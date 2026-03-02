@@ -10,6 +10,7 @@ import { Firebase } from '../services/firebaseService.js';
 
 // ─── UI callback injected by bootstrap (avoids services→ui dependency) ─
 let _toast = () => {};
+let _foregroundListenerRegistered = false;
 
 export function registerAnalyticsUI(toastFn) {
   _toast = toastFn;
@@ -41,7 +42,7 @@ export async function subscribeToPushNotifications() {
       return { success: false, error: msgResult.error };
     }
 
-    const { getToken } = msgResult;
+    const { getToken, onMessage } = msgResult;
     const registration = await navigator.serviceWorker.ready;
 
     const token = await getToken(Firebase.messaging, {
@@ -52,6 +53,22 @@ export async function subscribeToPushNotifications() {
     if (!token) {
       console.warn('[FCM] No token received');
       return { success: false, error: 'No FCM token received' };
+    }
+
+    // Handle foreground messages (background handled by SW)
+    if (!_foregroundListenerRegistered) {
+      onMessage(Firebase.messaging, (payload) => {
+        const title = payload.notification?.title || 'Focus Engine';
+        const body = payload.notification?.body || 'Stay on track.';
+        if (Notification.permission === 'granted') {
+          new Notification(title, {
+            body,
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-192.png',
+          });
+        }
+      });
+      _foregroundListenerRegistered = true;
     }
 
     const result = await FireDB.savePushToken(token);
