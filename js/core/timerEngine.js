@@ -6,7 +6,37 @@
 import { state, session, appLocals } from '../core/appState.js';
 import { fmtTime } from '../utils/formatUtils.js';
 
+// ─── Cached DOM refs (resolved once, avoids getElementById every tick) ─
+let _clockEls = null;
+let _sessionEls = null;
+
+function getClockEls() {
+  if (!_clockEls) {
+    _clockEls = {
+      time:     document.getElementById('liveTime'),
+      date:     document.getElementById('liveDate'),
+      greeting: document.getElementById('greeting'),
+      ring:     document.getElementById('ringProgress'),
+      ringVal:  document.getElementById('ringValue'),
+      ringEnd:  document.getElementById('ringEnd'),
+    };
+  }
+  return _clockEls;
+}
+
+function getSessionEls() {
+  if (!_sessionEls) {
+    _sessionEls = {
+      timer: document.getElementById('sessionTimer'),
+      qTimer: document.getElementById('questionTimer'),
+    };
+  }
+  return _sessionEls;
+}
+
 // ─── Clock ─────────────────────────────────────────────────────────────
+
+const CIRCUMFERENCE = 2 * Math.PI * 74;
 
 export function startClock() {
   updateClock();
@@ -15,18 +45,19 @@ export function startClock() {
 }
 
 export function updateClock() {
+  const els = getClockEls();
   const now = new Date();
   const h = now.getHours(), m = now.getMinutes();
 
-  document.getElementById('liveTime').textContent =
+  els.time.textContent =
     `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 
-  document.getElementById('liveDate').textContent =
+  els.date.textContent =
     now.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
 
   const name = state.settings.userName;
   const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  document.getElementById('greeting').textContent = name ? `${g}, ${name}` : g;
+  els.greeting.textContent = name ? `${g}, ${name}` : g;
 
   const [eh, em] = (state.settings.dayEndTime || '23:00').split(':').map(Number);
   const [sh, sm] = (state.settings.dayStartTime || '06:00').split(':').map(Number);
@@ -40,18 +71,16 @@ export function updateClock() {
   const totalDay = endSecs - startSecs;
   const progress = Math.max(0, Math.min(1, 1 - remaining / totalDay));
 
-  const circumference = 2 * Math.PI * 74;
-  const ring = document.getElementById('ringProgress');
-  ring.setAttribute('stroke-dasharray', circumference);
-  ring.setAttribute('stroke-dashoffset', circumference * (1 - progress));
+  els.ring.setAttribute('stroke-dasharray', CIRCUMFERENCE);
+  els.ring.setAttribute('stroke-dashoffset', CIRCUMFERENCE * (1 - progress));
 
   const hue = Math.round(240 - progress * 160);
-  ring.style.stroke = `hsl(${hue}, 80%, 65%)`;
+  els.ring.style.stroke = `hsl(${hue}, 80%, 65%)`;
 
   const remH = Math.floor(remaining / 3600);
   const remM = Math.floor((remaining % 3600) / 60);
-  document.getElementById('ringValue').textContent = `${remH}h ${remM}m`;
-  document.getElementById('ringEnd').textContent = `ends at ${state.settings.dayEndTime}`;
+  els.ringVal.textContent = `${remH}h ${remM}m`;
+  els.ringEnd.textContent = `ends at ${state.settings.dayEndTime}`;
 }
 
 // ─── Session Timer ─────────────────────────────────────────────────────
@@ -59,12 +88,12 @@ export function updateClock() {
 function tickSession() {
   if (!session.active || session.paused) return;
   session.elapsed = Math.floor((Date.now() - session.startTime) / 1000);
-  document.getElementById('sessionTimer').textContent = fmtTime(session.elapsed);
+  const els = getSessionEls();
+  els.timer.textContent = fmtTime(session.elapsed);
 
   if (session.mode === 'perQuestion' && session.currentQuestionStart) {
     session.questionElapsed = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
-    const qtEl = document.getElementById('questionTimer');
-    if (qtEl) qtEl.textContent = fmtTime(session.questionElapsed);
+    if (els.qTimer) els.qTimer.textContent = fmtTime(session.questionElapsed);
   }
 }
 

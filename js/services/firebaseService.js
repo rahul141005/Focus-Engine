@@ -30,7 +30,6 @@ export const Firebase = {
       return { success: true };
     }
     try {
-      console.log('[BOOT] Firebase init start');
       _initCalled = true;
       if (!FIREBASE_CONFIG) {
         console.error('[Firebase] FIREBASE_CONFIG is not defined');
@@ -48,7 +47,6 @@ export const Firebase = {
       _db = firestore.getFirestore(app);
       Firebase.db = _db;
 
-      console.log('[BOOT] Firebase init complete');
       return { success: true };
     } catch (err) {
       console.error('[Firebase] init failed:', err);
@@ -77,12 +75,10 @@ export const Firebase = {
   async getAll(collectionName) {
     if (!_db || !_firestore) return { success: false, error: 'Not connected' };
     try {
-      console.log(`[BOOT] Firestore reading collection: ${collectionName}`);
       const { collection, getDocs, query, orderBy } = _firestore;
       const q = query(collection(_db, collectionName), orderBy('created_at'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => doc.data());
-      console.log(`[BOOT] Firestore ${collectionName}: ${data.length} docs`);
       return { success: true, data };
     } catch (err) {
       console.error(`[Firebase] getAll ${collectionName}:`, err);

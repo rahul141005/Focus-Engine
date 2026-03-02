@@ -161,8 +161,6 @@ function showStartupError(phase, message) {
 // ─── Firebase Auto-Init ────────────────────────────────────────────────
 
 async function tryFirebaseInit() {
-  console.log('[BOOT] Phase: INIT_FIREBASE');
-
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -178,7 +176,6 @@ async function tryFirebaseInit() {
 
     if (result.success) {
       showCloudStatus('Connected to Firebase', 'success');
-      console.log('[BOOT] Phase: INIT_DB — starting data sync');
       try {
         await Promise.all([
           FireDB.syncDays(),
@@ -187,8 +184,6 @@ async function tryFirebaseInit() {
           FireDB.syncPersonalTasks(),
           FireDB.syncQuestionAnalytics(),
         ]);
-        console.log('[BOOT] Phase: HYDRATE_STATE — data sync complete');
-        console.log('[BOOT] Phase: RENDER_APP — re-rendering');
         renderHome();
         renderPlan();
         renderBacklog();
@@ -223,7 +218,6 @@ export function init() {
     return;
   }
   _initialized = true;
-  console.log('[BOOT] init start — Phase: HYDRATE_STATE');
 
   // Wire up UI callbacks for core/services layer (avoids layer violations)
   registerSessionUI({
@@ -238,30 +232,25 @@ export function init() {
   registerAnalyticsUI(toast);
 
   DB.load();
-  console.log('[BOOT] Local data loaded');
 
   if (state.settings.theme) {
     document.documentElement.dataset.theme = state.settings.theme;
   }
 
-  console.log('[BOOT] Phase: RENDER_APP');
   startClock();
   loadRandomQuote();
   renderHome();
   renderProgress();
-  console.log('[BOOT] Initial render complete');
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js')
       .then(reg => {
-        console.log('[FE] SW registered');
         // Safe update strategy: notify on new version
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
           if (newSW) {
             newSW.addEventListener('statechange', () => {
               if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[FE] New SW version available');
                 newSW.postMessage({ type: 'SKIP_WAITING' });
               }
             });

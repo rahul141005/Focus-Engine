@@ -3,27 +3,23 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { SUBJECT_COLORS } from '../../config/constants.js';
-import { esc, fmtTime, fmtMins } from '../../utils/formatUtils.js';
+import { esc, fmtTime } from '../../utils/formatUtils.js';
 import { parseLocalDate } from '../../utils/timeUtils.js';
 
-export function renderNoteCard(note, sessions, questionAnalytics) {
+export function renderNoteCard(note, sessionMap, qaMap) {
   const color = SUBJECT_COLORS[note.subject] || SUBJECT_COLORS.Other;
   const dateLabel = note.date
     ? parseLocalDate(note.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : '';
 
-  // Find matching session for duration & mode
-  const session = note.sessionId && sessions
-    ? sessions.find(s => s.id === note.sessionId)
-    : null;
+  // Find matching session for duration & mode via Map lookup (O(1))
+  const session = note.sessionId ? sessionMap.get(note.sessionId) : null;
   const durationLabel = session ? fmtTime(session.duration_seconds) : '';
   const modeBadge = session && session.mode === 'perQuestion' ? 'Timed Q' : (session ? 'Full' : '');
   const subNoteLabel = note.subNote || (session && session.subNote) || '';
 
-  // Question breakdown (if available from questionAnalytics)
-  const qaRecord = note.sessionId && questionAnalytics
-    ? questionAnalytics.find(q => q.sessionId === note.sessionId)
-    : null;
+  // Question breakdown via Map lookup (O(1))
+  const qaRecord = note.sessionId ? qaMap.get(note.sessionId) : null;
 
   let questionBreakdownHtml = '';
   if (qaRecord && qaRecord.questions && qaRecord.questions.length > 0) {

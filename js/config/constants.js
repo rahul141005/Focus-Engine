@@ -99,5 +99,3 @@ export const NOTIFICATION_MESSAGES = {
     "You logged pending personal tasks today.",
   ],
 };
-
-export const ENCOURAGEMENTS = QUOTES;

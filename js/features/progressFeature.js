@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { state } from '../core/appState.js';
-import { SUBJECT_COLORS, CONSISTENCY_WEIGHT, ENCOURAGEMENTS } from '../config/constants.js';
+import { SUBJECT_COLORS, CONSISTENCY_WEIGHT, QUOTES } from '../config/constants.js';
 import { fmtTime, fmtHHMM } from '../utils/formatUtils.js';
 import { todayStr, parseLocalDate } from '../utils/timeUtils.js';
 
@@ -198,7 +198,7 @@ export function renderProgress() {
     consistScoreEl.textContent = `${score}/100`;
   }
 
-  const enc = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+  const enc = QUOTES[Math.floor(Math.random() * QUOTES.length)];
   document.getElementById('encourageText').textContent = enc;
 
   const from = parseLocalDate(last7[0]).toLocaleDateString('en-IN', {day:'numeric',month:'short'});

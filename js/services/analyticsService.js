@@ -100,7 +100,6 @@ export async function subscribeToPushNotifications() {
               serviceWorkerRegistration: await navigator.serviceWorker.ready,
             });
             if (refreshedToken && refreshedToken !== state.pushSubscription?.token) {
-              console.log('[FCM] Token refreshed');
               await FireDB.savePushToken(refreshedToken);
               state.pushSubscription = { token: refreshedToken };
               DB.save();

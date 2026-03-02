@@ -69,7 +69,10 @@ export function renderPersonal() {
       notesEl.innerHTML = '<div class="empty-state" style="padding:16px 0"><div class="empty-title">No notes yet</div><div class="empty-sub">Notes are added after focus sessions.</div></div>';
     } else {
       const recentNotes = [...state.sessionNotes].reverse().slice(0, MAX_DISPLAYED_NOTES);
-      notesEl.innerHTML = recentNotes.map(n => renderNoteCard(n, state.sessions, state.questionAnalytics)).join('');
+      // Build lookup maps to avoid O(n) .find() per note card
+      const sessionMap = new Map(state.sessions.map(s => [s.id, s]));
+      const qaMap = new Map(state.questionAnalytics.map(q => [q.sessionId, q]));
+      notesEl.innerHTML = recentNotes.map(n => renderNoteCard(n, sessionMap, qaMap)).join('');
     }
   }
 }
