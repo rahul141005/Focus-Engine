@@ -24,12 +24,15 @@ export const FireDB = {
     if (!doc.created_at) {
       doc.created_at = new Date().toISOString();
     }
-    // Normalize sub_topic: ensure it's explicitly null (not undefined)
-    if (doc.sub_topic === undefined) {
-      doc.sub_topic = doc.subNote || null;
+    // Only normalize sub_topic for document types that use it
+    // (tasks, sessions, questionAnalytics, sessionNotes — NOT days or personalTasks)
+    if ('sub_topic' in doc || 'subNote' in doc) {
+      if (doc.sub_topic === undefined) {
+        doc.sub_topic = doc.subNote || null;
+      }
+      // Remove legacy subNote field from new writes
+      delete doc.subNote;
     }
-    // Remove legacy subNote field from new writes
-    delete doc.subNote;
     return doc;
   },
 

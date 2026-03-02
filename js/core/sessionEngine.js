@@ -252,6 +252,12 @@ export async function endSession() {
     session.questionIndex = 0;
     session.questionElapsed = 0;
     session.mode = 'full';
+    session.sub_topic = null;
+    session.taskId = null;
+    session.subject = '';
+    session.topic = '';
+    session.pausedAt = null;
+    session.currentQuestionStart = null;
     if (endBtn) endBtn.disabled = false;
     _ui.toast('Session too short (< 2 min) — not saved', 'warning');
     return;
