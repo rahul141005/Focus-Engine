@@ -174,7 +174,10 @@ async function trySupabaseInit() {
 let _initialized = false;
 
 export function init() {
-  if (_initialized) return; // prevent double initialization
+  if (_initialized) {
+    console.warn('[FE] init() already called — skipping');
+    return;
+  }
   _initialized = true;
 
   // Wire up UI callbacks for core/services layer (avoids layer violations)

@@ -205,7 +205,7 @@ export function switchSessionMode() {
 
 export function endSession() {
   if (!session.active) return;
-  session.active = false; // immediately mark inactive to prevent double-end
+  session.active = false;
   stopSessionTimer();
 
   if (session.paused) {
