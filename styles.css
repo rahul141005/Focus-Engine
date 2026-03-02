@@ -1922,6 +1922,7 @@ input, textarea, select { font-family: var(--font-body); }
 
 .toast.success { border-color: rgba(16,185,129,0.3); }
 .toast.error   { border-color: rgba(244,63,94,0.3); }
+.toast.warning { border-color: rgba(245,158,11,0.3); }
 
 /* ─── PROCESSING OVERLAY ────────────────────── */
 .processing-overlay {
@@ -2259,6 +2260,7 @@ input, textarea, select { font-family: var(--font-body); }
 }
 .toast.success .toast-icon { background: var(--emerald-dim); color: var(--emerald); }
 .toast.error .toast-icon { background: var(--rose-dim); color: var(--rose); }
+.toast.warning .toast-icon { background: var(--amber-dim); color: var(--amber); }
 
 /* ─── Session start animation (Feature 11) ── */
 .session-overlay.active .session-timer { animation: timerPulseIn 0.6s cubic-bezier(0.34,1.56,0.64,1); }

@@ -162,6 +162,7 @@ const App = (() => {
   let clockRef = null;
   let csvParsedData = null;
   let csvSelection = {};  // track selection state: { dayKey: { selected: bool, tasks: [bool,...], date: string } }
+  let lastSessionRecord = null; // For post-session notes
 
   // ─── LocalStorage ──────────────────────────────────────────────────────
   
@@ -579,7 +580,8 @@ const App = (() => {
   function toast(msg, type='') {
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+    const TOAST_ICONS = { success: '✓', error: '✗', warning: '⚠' };
+    const icon = TOAST_ICONS[type] || 'ℹ';
     const iconSpan = document.createElement('span');
     iconSpan.className = 'toast-icon';
     iconSpan.textContent = icon;
@@ -1732,10 +1734,14 @@ const App = (() => {
   function prevQuestion() {
     if (!session.active || session.paused || session.mode !== 'perQuestion') return;
     if (session.questions.length === 0) return;
-    // Go back without erasing recorded time — just restart current question timer from the previous question
+    // Save current question time before going back
+    const curQTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
+    if (curQTime > 0) {
+      session.questions.push({ number: session.questions.length + 1, seconds: curQTime, skipped: false });
+    }
+    // Go back to re-do previous question (recorded time is preserved in the array)
     session.currentQuestionStart = Date.now();
     session.questionElapsed = 0;
-    const prevQ = session.questions.pop();
     document.getElementById('questionNumber').textContent = session.questions.length + 1;
     document.getElementById('questionTimer').textContent = '00:00';
   }
@@ -1774,7 +1780,7 @@ const App = (() => {
 
     if (finalElapsed < MIN_SESSION_SECONDS) {
       session.active = false;
-      toast('Session too short (< 2 min) — not saved', '');
+      toast('Session too short (< 2 min) — not saved', 'warning');
       return;
     }
 
@@ -1879,19 +1885,19 @@ const App = (() => {
     detailsEl.innerHTML += notesHtml;
 
     // Store record reference for saving notes on close
-    document.getElementById('sessionSummaryOverlay')._record = record;
+    lastSessionRecord = record;
     document.getElementById('sessionSummaryOverlay').classList.add('active');
   }
 
   function closeSummary() {
     const overlay = document.getElementById('sessionSummaryOverlay');
     const notesInput = document.getElementById('summaryNotesInput');
-    if (notesInput && notesInput.value.trim() && overlay._record) {
+    if (notesInput && notesInput.value.trim() && lastSessionRecord) {
       state.sessionNotes.push({
         id: uid(),
-        sessionId: overlay._record.id,
-        subject: overlay._record.subject,
-        topic: overlay._record.topic,
+        sessionId: lastSessionRecord.id,
+        subject: lastSessionRecord.subject,
+        topic: lastSessionRecord.topic,
         text: notesInput.value.trim(),
         date: todayStr(),
         created_at: new Date().toISOString(),
@@ -1899,7 +1905,7 @@ const App = (() => {
       DB.save();
       toast('Note saved', 'success');
     }
-    overlay._record = null;
+    lastSessionRecord = null;
     overlay.classList.remove('active');
   }
 
