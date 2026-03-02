@@ -30,7 +30,10 @@ export function selectSubject(btn) {
   state.selectedSubject = btn.dataset.subj;
 }
 
+let _savingTask = false;
+
 export async function saveTask() {
+  if (_savingTask) return;
   if (!state.currentDayId) { toast('No day selected','error'); return; }
   const subj  = state.selectedSubject;
   const topic = document.getElementById('inputTaskTopic').value.trim();
@@ -38,6 +41,8 @@ export async function saveTask() {
 
   if (!subj)  { toast('Pick a subject', 'error'); return; }
   if (!topic) { toast('Enter a topic', 'error');  return; }
+
+  _savingTask = true;
 
   const task = {
     id: uid(), day_id: state.currentDayId,
@@ -48,6 +53,7 @@ export async function saveTask() {
   state.tasks.push(task);
   DB.save();
   await FireDB.insertTask(task);
+  _savingTask = false;
   closeSheet();
   renderPlan();
   renderHome();
@@ -141,15 +147,20 @@ export async function toggleEditTask(taskId) {
 
 // ─── Day Management ────────────────────────────────────────────────────
 
+let _savingDay = false;
+
 export async function saveDay() {
+  if (_savingDay) return;
   const label = document.getElementById('inputDayLabel').value.trim();
   const date  = document.getElementById('inputDayDate').value;
   if (!label) { toast('Enter a label', 'error'); return; }
 
+  _savingDay = true;
   const day = { id: uid(), label, date: date || null, created_at: new Date().toISOString() };
   state.days.push(day);
   DB.save();
   await FireDB.insertDay(day);
+  _savingDay = false;
   closeSheet();
   renderPlan();
   renderHome();
@@ -430,7 +441,8 @@ export async function confirmCSVImport() {
         day_id: day.id,
         subject: row.subject.trim(),
         topic: row.topic.trim(),
-        estimated_minutes: parseInt(row.estimated_minutes),
+        subNote: (row.subnote || row.sub_note || '').trim(),
+        estimated_minutes: parseInt(row.estimated_minutes) || 0,
         status: 'pending',
         created_at: new Date().toISOString()
       };

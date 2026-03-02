@@ -37,6 +37,7 @@ export const session = {
   taskId: null,
   subject: '',
   topic: '',
+  subNote: '',
   startTime: null,
   pausedAt: null,
   elapsed: 0,
@@ -57,5 +58,4 @@ export const appLocals = {
   csvSelection: {},
   lastSessionRecord: null,
   savingNotes: false,
-  planSearchTimer: null,
 };

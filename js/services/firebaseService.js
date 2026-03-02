@@ -7,14 +7,30 @@ import { FIREBASE_CONFIG } from '../config/routes.js';
 let _db = null;
 let _messaging = null;
 let _firestore = null; // module reference
+let _initCalled = false;
 
 export const Firebase = {
   db: null,
   messaging: null,
 
+  // Strip undefined fields from an object to prevent Firestore errors
+  _stripUndefined(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    const clean = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (val !== undefined) {
+        clean[key] = val;
+      }
+    }
+    return clean;
+  },
+
   async init() {
+    if (_initCalled && _db) {
+      return { success: true };
+    }
     try {
-      console.log('[BOOT] Firebase init start');
+      _initCalled = true;
       if (!FIREBASE_CONFIG) {
         console.error('[Firebase] FIREBASE_CONFIG is not defined');
         return { success: false, error: 'Firebase config is not defined' };
@@ -31,7 +47,6 @@ export const Firebase = {
       _db = firestore.getFirestore(app);
       Firebase.db = _db;
 
-      console.log('[BOOT] Firebase init complete');
       return { success: true };
     } catch (err) {
       console.error('[Firebase] init failed:', err);
@@ -60,12 +75,10 @@ export const Firebase = {
   async getAll(collectionName) {
     if (!_db || !_firestore) return { success: false, error: 'Not connected' };
     try {
-      console.log(`[BOOT] Firestore reading collection: ${collectionName}`);
       const { collection, getDocs, query, orderBy } = _firestore;
       const q = query(collection(_db, collectionName), orderBy('created_at'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => doc.data());
-      console.log(`[BOOT] Firestore ${collectionName}: ${data.length} docs`);
       return { success: true, data };
     } catch (err) {
       console.error(`[Firebase] getAll ${collectionName}:`, err);
@@ -77,8 +90,10 @@ export const Firebase = {
     if (!_db || !_firestore) return { success: false, error: 'Not connected' };
     try {
       const { doc, setDoc } = _firestore;
-      await setDoc(doc(_db, collectionName, id), data);
-      return { success: true, data };
+      // Strip undefined fields to prevent Firestore errors
+      const cleanData = Firebase._stripUndefined(data);
+      await setDoc(doc(_db, collectionName, id), cleanData);
+      return { success: true, data: cleanData };
     } catch (err) {
       console.error(`[Firebase] setDoc ${collectionName}/${id}:`, err);
       return { success: false, error: err.message };
@@ -88,9 +103,12 @@ export const Firebase = {
   async updateDoc(collectionName, id, updates) {
     if (!_db || !_firestore) return { success: false, error: 'Not connected' };
     try {
-      const { doc, updateDoc } = _firestore;
-      await updateDoc(doc(_db, collectionName, id), updates);
-      return { success: true, data: updates };
+      const { doc, setDoc } = _firestore;
+      // Use setDoc with merge:true instead of updateDoc to safely handle
+      // documents that may not exist yet (e.g., after offline creation)
+      const cleanUpdates = Firebase._stripUndefined(updates);
+      await setDoc(doc(_db, collectionName, id), cleanUpdates, { merge: true });
+      return { success: true, data: cleanUpdates };
     } catch (err) {
       console.error(`[Firebase] updateDoc ${collectionName}/${id}:`, err);
       return { success: false, error: err.message };

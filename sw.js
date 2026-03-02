@@ -37,7 +37,7 @@ messaging.onBackgroundMessage(function(payload) {
   return self.registration.showNotification(title, options);
 });
 
-const CACHE_VERSION  = 'focus-engine-v6';
+const CACHE_VERSION  = 'focus-engine-v8';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',
@@ -63,12 +63,14 @@ const STATIC_ASSETS  = [
   '/js/ui/modalController.js',
   '/js/ui/toastController.js',
   '/js/features/notesFeature.js',
+  '/js/features/notesEngine.js',
   '/js/features/progressFeature.js',
   '/js/features/backlogFeature.js',
   '/js/features/planFeature.js',
   '/js/utils/timeUtils.js',
   '/js/utils/formatUtils.js',
   '/js/utils/debounce.js',
+  '/js/ui/components/NoteCard.js',
   'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Sora:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js',
 ];
@@ -102,7 +104,6 @@ const NOTIFICATION_MESSAGES = {
 
 // ─── Install — cache static assets ───────────────────────────────────────────
 self.addEventListener('install', event => {
-  console.log('[SW] Installing…');
   event.waitUntil(
     caches.open(CACHE_VERSION).then(cache => {
       const promises = STATIC_ASSETS.map(url =>
@@ -110,7 +111,6 @@ self.addEventListener('install', event => {
       );
       return Promise.allSettled(promises);
     }).then(() => {
-      console.log('[SW] Static assets cached');
       return self.skipWaiting();
     })
   );
@@ -118,12 +118,10 @@ self.addEventListener('install', event => {
 
 // ─── Activate — clean old caches ─────────────────────────────────────────────
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating…');
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
         keys.filter(k => k !== CACHE_VERSION).map(k => {
-          console.log('[SW] Deleting old cache:', k);
           return caches.delete(k);
         })
       )
@@ -255,7 +253,6 @@ self.addEventListener('sync', event => {
 async function syncPendingData() {
   // In a full implementation, this would read from IndexedDB
   // and push queued writes to Firebase when connectivity is restored
-  console.log('[SW] Background sync: syncing pending data');
 }
 
 // ─── Message handler (from app → SW) ─────────────────────────────────────────

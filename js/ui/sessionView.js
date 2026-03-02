@@ -6,6 +6,7 @@ import { state, appLocals } from '../core/appState.js';
 import { fmtTime } from '../utils/formatUtils.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
 import { DB } from '../services/storageService.js';
+import { Firebase } from '../services/firebaseService.js';
 import { toast } from './toastController.js';
 
 export function showSessionSummary(record, questions, mode) {
@@ -14,8 +15,6 @@ export function showSessionSummary(record, questions, mode) {
   const overlay = document.getElementById('sessionSummaryOverlay');
   if (!statsEl || !detailsEl || !overlay) return;
   if (!Array.isArray(questions)) questions = [];
-  const totalMins = Math.floor(record.duration_seconds / 60);
-  const totalSecs = record.duration_seconds % 60;
 
   let statsHtml = `
     <div class="summary-stat-card">
@@ -26,6 +25,14 @@ export function showSessionSummary(record, questions, mode) {
       <div class="summary-stat-value">${record.subject}</div>
       <div class="summary-stat-label">Subject</div>
     </div>`;
+
+  if (record.subNote) {
+    statsHtml += `
+    <div class="summary-stat-card">
+      <div class="summary-stat-value" style="font-size:14px">${record.topic}</div>
+      <div class="summary-stat-label">${record.subNote}</div>
+    </div>`;
+  }
 
   if (mode === 'perQuestion' && questions.length > 0) {
     const avgSecs = Math.round(questions.reduce((a, q) => a + q.seconds, 0) / questions.length);
@@ -66,7 +73,7 @@ export function showSessionSummary(record, questions, mode) {
   overlay.classList.add('active');
 }
 
-export function closeSummary() {
+export async function closeSummary() {
   if (appLocals.savingNotes) return;
   const overlay = document.getElementById('sessionSummaryOverlay');
   const notesInput = document.getElementById('summaryNotesInput');
@@ -75,16 +82,19 @@ export function closeSummary() {
     const doneBtn = overlay.querySelector('.btn-primary');
     if (doneBtn) doneBtn.disabled = true;
     try {
-      state.sessionNotes.push({
+      const note = {
         id: uid(),
         sessionId: appLocals.lastSessionRecord.id,
         subject: appLocals.lastSessionRecord.subject,
         topic: appLocals.lastSessionRecord.topic,
+        subNote: appLocals.lastSessionRecord.subNote || '',
         text: notesInput.value.trim(),
         date: todayStr(),
         created_at: new Date().toISOString(),
-      });
+      };
+      state.sessionNotes.push(note);
       DB.save();
+      await Firebase.setDoc('sessionNotes', note.id, note);
       toast('Note saved', 'success');
     } catch (err) {
       console.error('[FE] Note save failed:', err);
