@@ -144,12 +144,13 @@ async function clearData() {
 
   // End active session if running (prevent timer interval leak)
   if (session.active) {
+    // Set active=false first to prevent tick from firing between flag set and clearInterval
     session.active = false;
     stopSessionTimer();
     document.getElementById('sessionOverlay').classList.remove('active');
     document.getElementById('perQuestionPanel').style.display = 'none';
     try {
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      if (document.fullscreenElement) document.exitFullscreen().catch((e) => console.debug('[FE] Fullscreen exit:', e));
     } catch(e) {}
   }
 
@@ -244,7 +245,7 @@ async function clearData() {
     }
 
     // 9. Apply default theme and re-render all views
-    document.documentElement.dataset.theme = 'focus';
+    document.documentElement.dataset.theme = state.settings.theme;
     renderHome();
     renderPlan();
     renderBacklog();
