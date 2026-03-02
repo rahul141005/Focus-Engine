@@ -608,7 +608,14 @@ const App = (() => {
   }
 
   function closeSheet() {
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('active'));
+    const activeSheet = document.querySelector('.bottom-sheet.active');
+    if (activeSheet) {
+      activeSheet.classList.add('closing');
+      activeSheet.addEventListener('animationend', function handler() {
+        activeSheet.classList.remove('active', 'closing');
+        activeSheet.removeEventListener('animationend', handler);
+      }, { once: true });
+    }
     document.getElementById('sheetBackdrop').classList.remove('active');
     state.currentDayId = null;
     state.reassignTaskId = null;
@@ -1346,6 +1353,7 @@ const App = (() => {
     const task = state.tasks.find(t => t.id === taskId);
     if (!task) return;
     task.status = task.status === 'completed' ? 'pending' : 'completed';
+    if (task.status === 'completed' && navigator.vibrate) navigator.vibrate(30);
     DB.save();
     Supa.updateTask(taskId, { status: task.status });
     renderPlan();
@@ -1863,6 +1871,7 @@ const App = (() => {
     // Show summary overlay
     showSessionSummary(record, summaryQuestions, summaryMode);
 
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     if (state.settings.sound) playEndTone();
   }
 
@@ -1983,6 +1992,16 @@ const App = (() => {
 
   // ─── CSV Import (FIXED: Date Logic) ───────────────────────────────────
   
+  function setCsvStep(stepNum) {
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById('csvStep' + i);
+      if (!el) continue;
+      el.classList.remove('active', 'done');
+      if (i < stepNum) el.classList.add('done');
+      else if (i === stepNum) el.classList.add('active');
+    }
+  }
+
   async function handleCSVImport(file) {
     if (!file || !file.name.toLowerCase().endsWith('.csv')) {
       toast('Please select a valid CSV file', 'error');
@@ -1991,11 +2010,15 @@ const App = (() => {
 
     const proc = document.getElementById('csvProcessing');
     proc.classList.add('active');
-    document.getElementById('csvStatus').textContent = 'Reading CSV…';
+    document.getElementById('csvStatus').textContent = 'Reading file…';
+    setCsvStep(1);
 
     try {
+      await new Promise(r => setTimeout(r, 300));
       const text = await file.text();
       document.getElementById('csvStatus').textContent = 'Parsing data…';
+      setCsvStep(2);
+      await new Promise(r => setTimeout(r, 200));
       
       const parsed = Papa.parse(text, {
         header: true,
@@ -2026,7 +2049,9 @@ const App = (() => {
         return;
       }
 
-      document.getElementById('csvStatus').textContent = 'Validating data…';
+      document.getElementById('csvStatus').textContent = 'Validating rows…';
+      setCsvStep(3);
+      await new Promise(r => setTimeout(r, 200));
 
       const errors = [];
       rows.forEach((row, idx) => {
@@ -2048,6 +2073,8 @@ const App = (() => {
       }
 
       document.getElementById('csvStatus').textContent = 'Preparing preview…';
+      setCsvStep(4);
+      await new Promise(r => setTimeout(r, 300));
 
       const dayGroups = {};
       rows.forEach(row => {
@@ -2169,8 +2196,15 @@ const App = (() => {
 
   async function confirmCSVImport() {
     if (!csvParsedData) return;
+
+    const proc = document.getElementById('csvProcessing');
+    proc.classList.add('active');
+    document.getElementById('csvStatus').textContent = 'Importing study plan…';
+    setCsvStep(1);
+
     const dayKeys = Object.keys(csvParsedData);
     let addedDays = 0, addedTasks = 0;
+    const totalDays = dayKeys.filter(k => csvSelection[k] && csvSelection[k].selected).length;
 
     for (const dayKey of dayKeys) {
       const sel = csvSelection[dayKey];
@@ -2201,6 +2235,10 @@ const App = (() => {
       await Supa.insertDay(day);
       addedDays++;
 
+      const stepNum = Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1);
+      setCsvStep(stepNum);
+      document.getElementById('csvStatus').textContent = `Adding day ${addedDays} of ${totalDays}…`;
+
       for (const row of selectedTasks) {
         const task = {
           id: uid(),
@@ -2217,9 +2255,14 @@ const App = (() => {
       }
     }
 
+    document.getElementById('csvStatus').textContent = 'Finishing up…';
+    setCsvStep(4);
+    await new Promise(r => setTimeout(r, 300));
+
     DB.save();
     csvParsedData = null;
     csvSelection = {};
+    proc.classList.remove('active');
     closeSheet();
     renderPlan();
     renderHome();
