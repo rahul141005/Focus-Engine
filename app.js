@@ -941,14 +941,18 @@ const App = (() => {
 
     // Render rescheduled topics section
     const rescheduledEl = document.getElementById('rescheduledList');
+    const rescheduledHeader = rescheduledEl ? rescheduledEl.previousElementSibling : null;
     if (rescheduledEl) {
       const rescheduled = state.rescheduledTopics.filter(r => {
         const task = state.tasks.find(t => t.id === r.taskId);
         return task && task.status !== 'completed';
       });
       if (rescheduled.length === 0) {
-        rescheduledEl.innerHTML = '<div style="font-size:13px;color:var(--text-3);text-align:center;padding:10px 0">No rescheduled topics</div>';
+        rescheduledEl.style.display = 'none';
+        if (rescheduledHeader) rescheduledHeader.style.display = 'none';
       } else {
+        rescheduledEl.style.display = '';
+        if (rescheduledHeader) rescheduledHeader.style.display = '';
         rescheduledEl.innerHTML = rescheduled.map(r => {
           const task = state.tasks.find(t => t.id === r.taskId);
           if (!task) return '';
@@ -1539,7 +1543,6 @@ const App = (() => {
     const task = state.tasks.find(t => t.id === entry.taskId);
     if (task) {
       task.day_id = entry.originalDayId;
-      DB.save();
       Supa.updateTask(task.id, { day_id: entry.originalDayId });
     }
     state.rescheduledTopics = state.rescheduledTopics.filter(r => r.id !== rescheduleId);
@@ -1708,8 +1711,11 @@ const App = (() => {
     const wasPaused = session.paused;
     if (!wasPaused) pauseSession();
 
+    // Use pausedAt as the reference point — Date.now() includes pause duration
+    const refTime = session.pausedAt || Date.now();
+
     if (session.mode === 'perQuestion' && session.currentQuestionStart) {
-      const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
+      const qTime = Math.floor((refTime - session.currentQuestionStart) / 1000);
       if (qTime > 0) session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: false });
     }
 
@@ -1718,7 +1724,8 @@ const App = (() => {
     const modeBtn = document.getElementById('btnSwitchMode');
     if (session.mode === 'perQuestion') {
       pqPanel.style.display = '';
-      session.currentQuestionStart = Date.now();
+      // Set to pausedAt so resume adjustment (+=pausedDuration) yields correct resumeTime
+      session.currentQuestionStart = refTime;
       session.questionElapsed = 0;
       document.getElementById('questionNumber').textContent = session.questions.length + 1;
       document.getElementById('questionTimer').textContent = '00:00';
@@ -1749,6 +1756,7 @@ const App = (() => {
   function endSession() {
     if (!session.active) return;
     clearInterval(session.timerRef);
+    session.timerRef = null;
 
     // Adjust for pause FIRST, before capturing final question data
     if (session.paused) {
@@ -1758,6 +1766,7 @@ const App = (() => {
         session.currentQuestionStart += pausedDuration;
       }
       session.paused = false;
+      session.pausedAt = null;
     }
 
     // Capture final per-question data (now pause-adjusted)
@@ -1768,7 +1777,7 @@ const App = (() => {
       }
     }
 
-    const finalElapsed = Math.floor((Date.now() - session.startTime) / 1000);
+    const finalElapsed = Math.max(0, Math.floor((Date.now() - session.startTime) / 1000));
     document.getElementById('sessionOverlay').classList.remove('active');
     document.getElementById('perQuestionPanel').style.display = 'none';
 
@@ -1820,14 +1829,24 @@ const App = (() => {
 
     DB.save();
     Supa.insertSession(record);
+
+    // Capture data needed for summary before resetting session
+    const summaryQuestions = [...session.questions];
+    const summaryMode = session.mode;
+
+    // Fully reset session state
     session.active = false;
+    session.paused = false;
+    session.taskId = null;
+    session.pausedAt = null;
+    session.currentQuestionStart = null;
 
     renderHome();
     renderProgress();
     renderBacklog();
 
     // Show summary overlay
-    showSessionSummary(record, session.questions, session.mode);
+    showSessionSummary(record, summaryQuestions, summaryMode);
 
     if (state.settings.sound) playEndTone();
   }
@@ -2297,7 +2316,7 @@ const App = (() => {
       let subscription = await registration.pushManager.getSubscription();
       
       if (!subscription) {
-        const vapidPublicKey = BEy_F1htue07CuKuuZ9W_ona_4Jwer5MzMzBovAzYosHkzoWR4hKEPF3fuAHUCUgAGjgIq0dFgei9AqC_JqIuFI;
+        const vapidPublicKey = VAPID_PUBLIC_KEY;
         
         if (!vapidPublicKey) {
           console.warn('VAPID key not configured');
