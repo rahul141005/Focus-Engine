@@ -17,6 +17,7 @@ import {
 } from './ui/renderEngine.js';
 import { renderProgress } from './features/progressFeature.js';
 import { renderPersonal, addPersonalTask, togglePersonalTask, deletePersonalTask } from './features/notesFeature.js';
+import { toggleNoteExpand, openEditNote, saveEditNote, deleteSessionNote, closeNoteModal } from './features/notesEngine.js';
 import { switchTab } from './ui/tabsController.js';
 import { closeSummary, showSessionSummary } from './ui/sessionView.js';
 import { startClock, updateClock } from './core/timerEngine.js';
@@ -404,6 +405,11 @@ export const AppAPI = {
   addPersonalTask,
   togglePersonalTask,
   deletePersonalTask,
+  toggleNoteExpand,
+  openEditNote,
+  saveEditNote,
+  deleteSessionNote,
+  closeNoteModal,
   toggleCSVDay,
   toggleCSVTask,
   updateCSVDayDate,
