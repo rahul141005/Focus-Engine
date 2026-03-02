@@ -65,6 +65,8 @@ export function renderPersonal() {
 
   const notesEl = document.getElementById('sessionNotesList');
   if (notesEl) {
+    // Expose state for NoteCard component to look up session data
+    window.__feState = state;
     if (state.sessionNotes.length === 0) {
       notesEl.innerHTML = '<div class="empty-state" style="padding:16px 0"><div class="empty-title">No notes yet</div><div class="empty-sub">Notes are added after focus sessions.</div></div>';
     } else {

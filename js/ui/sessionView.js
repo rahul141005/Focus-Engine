@@ -28,6 +28,14 @@ export function showSessionSummary(record, questions, mode) {
       <div class="summary-stat-label">Subject</div>
     </div>`;
 
+  if (record.subNote) {
+    statsHtml += `
+    <div class="summary-stat-card">
+      <div class="summary-stat-value" style="font-size:14px">${record.topic}</div>
+      <div class="summary-stat-label">${record.subNote}</div>
+    </div>`;
+  }
+
   if (mode === 'perQuestion' && questions.length > 0) {
     const avgSecs = Math.round(questions.reduce((a, q) => a + q.seconds, 0) / questions.length);
     statsHtml += `
@@ -81,6 +89,7 @@ export async function closeSummary() {
         sessionId: appLocals.lastSessionRecord.id,
         subject: appLocals.lastSessionRecord.subject,
         topic: appLocals.lastSessionRecord.topic,
+        subNote: appLocals.lastSessionRecord.subNote || '',
         text: notesInput.value.trim(),
         date: todayStr(),
         created_at: new Date().toISOString(),

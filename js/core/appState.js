@@ -37,6 +37,7 @@ export const session = {
   taskId: null,
   subject: '',
   topic: '',
+  subNote: '',
   startTime: null,
   pausedAt: null,
   elapsed: 0,

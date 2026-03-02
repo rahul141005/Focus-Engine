@@ -108,6 +108,7 @@ export function startSession(taskId) {
   session.taskId    = taskId;
   session.subject   = task.subject;
   session.topic     = task.topic;
+  session.subNote   = '';
 
   _ui.openSheet('sheetSessionMode');
 }
@@ -115,6 +116,13 @@ export function startSession(taskId) {
 export function startSessionWithMode(mode) {
   const task = state.tasks.find(t => t.id === session.taskId);
   if (!task) return;
+
+  // Read sub-note from input if present
+  const subNoteInput = document.getElementById('sessionSubNoteInput');
+  if (subNoteInput) {
+    session.subNote = subNoteInput.value.trim();
+    subNoteInput.value = '';
+  }
 
   _ui.closeSheet();
 
@@ -130,6 +138,13 @@ export function startSessionWithMode(mode) {
 
   document.getElementById('sessionSubject').textContent = task.subject;
   document.getElementById('sessionTopic').textContent   = task.topic;
+
+  const subNoteEl = document.getElementById('sessionSubNote');
+  if (subNoteEl) {
+    subNoteEl.textContent = session.subNote || '';
+    subNoteEl.style.display = session.subNote ? '' : 'none';
+  }
+
   document.getElementById('sessionTimer').textContent   = '00:00';
   document.getElementById('sessionStatus').textContent  = 'RUNNING';
   document.getElementById('btnPauseSession').textContent = 'Pause';
@@ -253,6 +268,7 @@ export async function endSession() {
     id: uid(),
     subject: session.subject,
     topic: session.topic,
+    subNote: session.subNote || '',
     duration_seconds: finalElapsed,
     session_date: todayStr(),
     mode: session.mode,
@@ -278,6 +294,7 @@ export async function endSession() {
       sessionId: record.id,
       subject: session.subject,
       topic: session.topic,
+      subNote: session.subNote || '',
       date: todayStr(),
       questions: validQuestions,
       created_at: new Date().toISOString(),
@@ -302,6 +319,7 @@ export async function endSession() {
   session.questionIndex = 0;
   session.questionElapsed = 0;
   session.mode = 'full';
+  session.subNote = '';
 
   _ui.renderHome();
   _ui.renderProgress();
