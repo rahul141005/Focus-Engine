@@ -611,10 +611,12 @@ const App = (() => {
     const activeSheet = document.querySelector('.bottom-sheet.active');
     if (activeSheet) {
       activeSheet.classList.add('closing');
-      activeSheet.addEventListener('animationend', function handler() {
+      const cleanup = () => {
         activeSheet.classList.remove('active', 'closing');
-        activeSheet.removeEventListener('animationend', handler);
-      }, { once: true });
+      };
+      activeSheet.addEventListener('animationend', cleanup, { once: true });
+      // Safety fallback — ensure sheet closes even if animationend doesn't fire
+      setTimeout(cleanup, 350);
     }
     document.getElementById('sheetBackdrop').classList.remove('active');
     state.currentDayId = null;
@@ -2008,17 +2010,20 @@ const App = (() => {
       return;
     }
 
+    if (typeof Papa === 'undefined') {
+      toast('CSV parser not loaded — check your internet connection', 'error');
+      return;
+    }
+
     const proc = document.getElementById('csvProcessing');
     proc.classList.add('active');
     document.getElementById('csvStatus').textContent = 'Reading file…';
     setCsvStep(1);
 
     try {
-      await new Promise(r => setTimeout(r, 300));
       const text = await file.text();
       document.getElementById('csvStatus').textContent = 'Parsing data…';
       setCsvStep(2);
-      await new Promise(r => setTimeout(r, 200));
       
       const parsed = Papa.parse(text, {
         header: true,
@@ -2051,7 +2056,6 @@ const App = (() => {
 
       document.getElementById('csvStatus').textContent = 'Validating rows…';
       setCsvStep(3);
-      await new Promise(r => setTimeout(r, 200));
 
       const errors = [];
       rows.forEach((row, idx) => {
@@ -2074,7 +2078,6 @@ const App = (() => {
 
       document.getElementById('csvStatus').textContent = 'Preparing preview…';
       setCsvStep(4);
-      await new Promise(r => setTimeout(r, 300));
 
       const dayGroups = {};
       rows.forEach(row => {
@@ -2232,7 +2235,7 @@ const App = (() => {
       };
 
       state.days.push(day);
-      await Supa.insertDay(day);
+      Supa.insertDay(day);
       addedDays++;
 
       const stepNum = totalDays > 0 ? Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1) : 1;
@@ -2250,14 +2253,10 @@ const App = (() => {
           created_at: new Date().toISOString()
         };
         state.tasks.push(task);
-        await Supa.insertTask(task);
+        Supa.insertTask(task);
         addedTasks++;
       }
     }
-
-    document.getElementById('csvStatus').textContent = 'Finishing up…';
-    setCsvStep(4);
-    await new Promise(r => setTimeout(r, 300));
 
     DB.save();
     csvParsedData = null;
