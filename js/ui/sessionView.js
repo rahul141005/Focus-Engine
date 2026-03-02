@@ -6,6 +6,7 @@ import { state, appLocals } from '../core/appState.js';
 import { fmtTime } from '../utils/formatUtils.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
 import { DB } from '../services/storageService.js';
+import { Firebase } from '../services/firebaseService.js';
 import { toast } from './toastController.js';
 
 export function showSessionSummary(record, questions, mode) {
@@ -66,7 +67,7 @@ export function showSessionSummary(record, questions, mode) {
   overlay.classList.add('active');
 }
 
-export function closeSummary() {
+export async function closeSummary() {
   if (appLocals.savingNotes) return;
   const overlay = document.getElementById('sessionSummaryOverlay');
   const notesInput = document.getElementById('summaryNotesInput');
@@ -75,7 +76,7 @@ export function closeSummary() {
     const doneBtn = overlay.querySelector('.btn-primary');
     if (doneBtn) doneBtn.disabled = true;
     try {
-      state.sessionNotes.push({
+      const note = {
         id: uid(),
         sessionId: appLocals.lastSessionRecord.id,
         subject: appLocals.lastSessionRecord.subject,
@@ -83,8 +84,10 @@ export function closeSummary() {
         text: notesInput.value.trim(),
         date: todayStr(),
         created_at: new Date().toISOString(),
-      });
+      };
+      state.sessionNotes.push(note);
       DB.save();
+      await Firebase.setDoc('sessionNotes', note.id, note);
       toast('Note saved', 'success');
     } catch (err) {
       console.error('[FE] Note save failed:', err);

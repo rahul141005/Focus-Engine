@@ -37,7 +37,7 @@ messaging.onBackgroundMessage(function(payload) {
   return self.registration.showNotification(title, options);
 });
 
-const CACHE_VERSION  = 'focus-engine-v6';
+const CACHE_VERSION  = 'focus-engine-v7';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',
@@ -63,12 +63,15 @@ const STATIC_ASSETS  = [
   '/js/ui/modalController.js',
   '/js/ui/toastController.js',
   '/js/features/notesFeature.js',
+  '/js/features/notesEngine.js',
   '/js/features/progressFeature.js',
   '/js/features/backlogFeature.js',
   '/js/features/planFeature.js',
   '/js/utils/timeUtils.js',
   '/js/utils/formatUtils.js',
   '/js/utils/debounce.js',
+  '/js/ui/components/NoteCard.js',
+  '/js/ui/components/NoteModal.js',
   'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Sora:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js',
 ];

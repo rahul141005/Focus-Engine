@@ -71,9 +71,19 @@ function tickSession() {
 export function startSessionTimer() {
   if (session.timerRef) { clearInterval(session.timerRef); }
   session.timerRef = setInterval(tickSession, 1000);
+
+  // Guard against background tab freeze — recalculate on visibility restore
+  document.addEventListener('visibilitychange', _onVisibilityChange);
+}
+
+function _onVisibilityChange() {
+  if (document.visibilityState === 'visible' && session.active && !session.paused) {
+    tickSession();
+  }
 }
 
 export function stopSessionTimer() {
   clearInterval(session.timerRef);
   session.timerRef = null;
+  document.removeEventListener('visibilitychange', _onVisibilityChange);
 }

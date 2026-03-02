@@ -209,6 +209,10 @@ export async function endSession() {
   session.active = false;
   stopSessionTimer();
 
+  // Disable end session button to prevent double submission
+  const endBtn = document.getElementById('btnEndSession');
+  if (endBtn) endBtn.disabled = true;
+
   if (session.paused) {
     const pausedDuration = Date.now() - session.pausedAt;
     session.startTime += pausedDuration;
@@ -240,6 +244,7 @@ export async function endSession() {
     session.questionIndex = 0;
     session.questionElapsed = 0;
     session.mode = 'full';
+    if (endBtn) endBtn.disabled = false;
     _ui.toast('Session too short (< 2 min) — not saved', 'warning');
     return;
   }
@@ -250,6 +255,7 @@ export async function endSession() {
     topic: session.topic,
     duration_seconds: finalElapsed,
     session_date: todayStr(),
+    mode: session.mode,
     created_at: new Date().toISOString(),
   };
 
@@ -305,4 +311,7 @@ export async function endSession() {
 
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   if (state.settings.sound) playEndTone();
+
+  // Re-enable end session button
+  if (endBtn) endBtn.disabled = false;
 }

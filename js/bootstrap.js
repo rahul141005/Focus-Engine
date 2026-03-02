@@ -143,34 +143,73 @@ function clearData() {
   toast('Data cleared');
 }
 
+// ─── Startup Phase Tracking ────────────────────────────────────────────
+
+const STARTUP_PHASES = ['INIT_FIREBASE', 'INIT_DB', 'HYDRATE_STATE', 'INIT_PUSH', 'RENDER_APP'];
+const STARTUP_TIMEOUT_MS = 15000;
+
+function showStartupError(phase, message) {
+  console.error(`[BOOT] Startup failed at ${phase}: ${message}`);
+  const el = document.getElementById('startupError');
+  if (el) {
+    el.textContent = `Startup issue at ${phase}: ${message}. Showing local data.`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 8000);
+  }
+}
+
 // ─── Firebase Auto-Init ────────────────────────────────────────────────
 
 async function tryFirebaseInit() {
-  console.log('[BOOT] Firebase auto-init starting');
-  const result = await FireDB.init();
-  if (result.success) {
-    showCloudStatus('Connected to Firebase', 'success');
-    console.log('[BOOT] Firestore connected — starting data sync');
-    Promise.all([
-      FireDB.syncDays(),
-      FireDB.syncTasks(),
-      FireDB.syncSessions(),
-      FireDB.syncPersonalTasks(),
-      FireDB.syncQuestionAnalytics(),
-    ]).then(() => {
-      console.log('[BOOT] Data fetch complete — re-rendering');
-      renderHome();
-      renderPlan();
-      renderBacklog();
-      renderProgress();
-      renderPersonal();
-    }).catch(err => {
-      console.error('[Firebase] sync failed:', err);
-      showCloudStatus('Database sync error — showing last available data', 'error');
-    });
-  } else {
-    console.warn('[BOOT] Firebase offline:', result.error);
-    showCloudStatus('Firebase offline — data saved locally', 'info');
+  console.log('[BOOT] Phase: INIT_FIREBASE');
+
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    console.warn('[BOOT] Firebase init timed out');
+    showStartupError('INIT_FIREBASE', 'Connection timed out');
+    showCloudStatus('Firebase timeout — showing local data', 'info');
+  }, STARTUP_TIMEOUT_MS);
+
+  try {
+    const result = await FireDB.init();
+    clearTimeout(timeout);
+    if (timedOut) return;
+
+    if (result.success) {
+      showCloudStatus('Connected to Firebase', 'success');
+      console.log('[BOOT] Phase: INIT_DB — starting data sync');
+      try {
+        await Promise.all([
+          FireDB.syncDays(),
+          FireDB.syncTasks(),
+          FireDB.syncSessions(),
+          FireDB.syncPersonalTasks(),
+          FireDB.syncQuestionAnalytics(),
+        ]);
+        console.log('[BOOT] Phase: HYDRATE_STATE — data sync complete');
+        console.log('[BOOT] Phase: RENDER_APP — re-rendering');
+        renderHome();
+        renderPlan();
+        renderBacklog();
+        renderProgress();
+        renderPersonal();
+      } catch (err) {
+        console.error('[Firebase] sync failed:', err);
+        showCloudStatus('Database sync error — showing last available data', 'error');
+        showStartupError('INIT_DB', err.message);
+      }
+    } else {
+      console.warn('[BOOT] Firebase offline:', result.error);
+      showCloudStatus('Firebase offline — data saved locally', 'info');
+    }
+  } catch (err) {
+    clearTimeout(timeout);
+    if (!timedOut) {
+      console.error('[BOOT] Firebase init error:', err);
+      showStartupError('INIT_FIREBASE', err.message);
+      showCloudStatus('Firebase error — data saved locally', 'error');
+    }
   }
 }
 
@@ -184,7 +223,7 @@ export function init() {
     return;
   }
   _initialized = true;
-  console.log('[BOOT] init start');
+  console.log('[BOOT] init start — Phase: HYDRATE_STATE');
 
   // Wire up UI callbacks for core/services layer (avoids layer violations)
   registerSessionUI({
@@ -205,16 +244,30 @@ export function init() {
     document.documentElement.dataset.theme = state.settings.theme;
   }
 
+  console.log('[BOOT] Phase: RENDER_APP');
   startClock();
   loadRandomQuote();
-  console.log('[BOOT] Render start');
   renderHome();
   renderProgress();
-  console.log('[BOOT] Render complete');
+  console.log('[BOOT] Initial render complete');
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js')
-      .then(() => console.log('[FE] SW registered'))
+      .then(reg => {
+        console.log('[FE] SW registered');
+        // Safe update strategy: notify on new version
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          if (newSW) {
+            newSW.addEventListener('statechange', () => {
+              if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('[FE] New SW version available');
+                newSW.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          }
+        });
+      })
       .catch(err => console.warn('[FE] SW error', err));
   }
 

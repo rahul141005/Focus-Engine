@@ -11,6 +11,14 @@ export const FireDB = {
     return await Firebase.init();
   },
 
+  // Ensure document has required fields before saving
+  _ensureFields(doc) {
+    if (!doc.created_at) {
+      doc.created_at = new Date().toISOString();
+    }
+    return doc;
+  },
+
   async syncDays() {
     const result = await Firebase.getAll('days');
     if (!result.success) return result;
@@ -107,11 +115,11 @@ export const FireDB = {
   },
 
   async insertDay(day) {
-    return await Firebase.setDoc('days', day.id, day);
+    return await Firebase.setDoc('days', day.id, FireDB._ensureFields(day));
   },
 
   async insertTask(task) {
-    return await Firebase.setDoc('tasks', task.id, task);
+    return await Firebase.setDoc('tasks', task.id, FireDB._ensureFields(task));
   },
 
   async updateTask(id, updates) {
@@ -131,11 +139,11 @@ export const FireDB = {
   },
 
   async insertSession(s) {
-    return await Firebase.setDoc('sessions', s.id, s);
+    return await Firebase.setDoc('sessions', s.id, FireDB._ensureFields(s));
   },
 
   async insertPersonalTask(task) {
-    return await Firebase.setDoc('personalTasks', task.id, task);
+    return await Firebase.setDoc('personalTasks', task.id, FireDB._ensureFields(task));
   },
 
   async updatePersonalTask(id, updates) {
@@ -147,7 +155,7 @@ export const FireDB = {
   },
 
   async insertQuestionAnalytics(record) {
-    return await Firebase.setDoc('questionAnalytics', record.id, record);
+    return await Firebase.setDoc('questionAnalytics', record.id, FireDB._ensureFields(record));
   },
 
   async savePushToken(token) {

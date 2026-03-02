@@ -11,6 +11,7 @@ import { Firebase } from '../services/firebaseService.js';
 // ─── UI callback injected by bootstrap (avoids services→ui dependency) ─
 let _toast = () => {};
 let _foregroundListenerRegistered = false;
+let _tokenRefreshRegistered = false;
 
 export function registerAnalyticsUI(toastFn) {
   _toast = toastFn;
@@ -66,7 +67,6 @@ export async function subscribeToPushNotifications() {
             new Notification(title, {
               body,
               icon: '/icons/icon-192.png',
-              // badge omitted: not supported in foreground Notification() constructor
             });
           }
         });
@@ -86,6 +86,29 @@ export async function subscribeToPushNotifications() {
     if (result.success) {
       state.pushSubscription = { token };
       DB.save();
+
+      // Set up token refresh handler
+      if (!_tokenRefreshRegistered) {
+        _tokenRefreshRegistered = true;
+        // Periodically check for token refresh (Firebase v9+ does not have onTokenRefresh)
+        setInterval(async () => {
+          try {
+            const refreshedToken = await getToken(Firebase.messaging, {
+              vapidKey: FCM_VAPID_KEY,
+              serviceWorkerRegistration: await navigator.serviceWorker.ready,
+            });
+            if (refreshedToken && refreshedToken !== state.pushSubscription?.token) {
+              console.log('[FCM] Token refreshed');
+              await FireDB.savePushToken(refreshedToken);
+              state.pushSubscription = { token: refreshedToken };
+              DB.save();
+            }
+          } catch (e) {
+            console.warn('[FCM] Token refresh check failed:', e);
+          }
+        }, 3600000); // Check every hour
+      }
+
       return { success: true, token };
     }
 
