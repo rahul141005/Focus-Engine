@@ -250,15 +250,23 @@ function setCsvStep(stepNum) {
 // ─── CSV Import Helpers ────────────────────────────────────────────────
 
 function resolveSubTopic(row) {
-  // Map various header names to sub_topic (case-insensitive via transformHeader)
-  const raw = row.sub_topic || row['sub-topic'] || row.subtopic || row.subnote || row.sub_note || '';
+  // Headers already normalized by transformHeader: hyphens/spaces → underscores
+  // So "sub-topic" → "sub_topic", "subtopic" stays "subtopic", etc.
+  const raw = row.sub_topic || row.subtopic || row.subnote || row.sub_note || '';
   const val = typeof raw === 'string' ? raw.trim() : '';
   return val || null;
 }
 
 function sanitizeString(val) {
   if (typeof val !== 'string') return '';
-  return val.replace(/[<>"'&]/g, '').trim();
+  // Iteratively strip HTML tags to prevent XSS; esc() handles encoding at render time
+  let result = val;
+  let prev;
+  do {
+    prev = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== prev);
+  return result.trim();
 }
 
 export async function handleCSVImport(file) {
