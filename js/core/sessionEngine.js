@@ -108,7 +108,7 @@ export function startSession(taskId) {
   session.taskId    = taskId;
   session.subject   = task.subject;
   session.topic     = task.topic;
-  session.subNote   = '';
+  session.sub_topic = task.sub_topic || null;
 
   _ui.openSheet('sheetSessionMode');
 }
@@ -116,13 +116,6 @@ export function startSession(taskId) {
 export function startSessionWithMode(mode) {
   const task = state.tasks.find(t => t.id === session.taskId);
   if (!task) return;
-
-  // Read sub-note from input if present
-  const subNoteInput = document.getElementById('sessionSubNoteInput');
-  if (subNoteInput) {
-    session.subNote = subNoteInput.value.trim();
-    subNoteInput.value = '';
-  }
 
   _ui.closeSheet();
 
@@ -139,10 +132,10 @@ export function startSessionWithMode(mode) {
   document.getElementById('sessionSubject').textContent = task.subject;
   document.getElementById('sessionTopic').textContent   = task.topic;
 
-  const subNoteEl = document.getElementById('sessionSubNote');
-  if (subNoteEl) {
-    subNoteEl.textContent = session.subNote || '';
-    subNoteEl.style.display = session.subNote ? '' : 'none';
+  const subTopicEl = document.getElementById('sessionSubTopic');
+  if (subTopicEl) {
+    subTopicEl.textContent = session.sub_topic || '';
+    subTopicEl.style.display = session.sub_topic ? '' : 'none';
   }
 
   document.getElementById('sessionTimer').textContent   = '00:00';
@@ -259,6 +252,12 @@ export async function endSession() {
     session.questionIndex = 0;
     session.questionElapsed = 0;
     session.mode = 'full';
+    session.sub_topic = null;
+    session.taskId = null;
+    session.subject = '';
+    session.topic = '';
+    session.pausedAt = null;
+    session.currentQuestionStart = null;
     if (endBtn) endBtn.disabled = false;
     _ui.toast('Session too short (< 2 min) — not saved', 'warning');
     return;
@@ -268,7 +267,7 @@ export async function endSession() {
     id: uid(),
     subject: session.subject,
     topic: session.topic,
-    subNote: session.subNote || '',
+    sub_topic: session.sub_topic || null,
     duration_seconds: finalElapsed,
     session_date: todayStr(),
     mode: session.mode,
@@ -294,7 +293,7 @@ export async function endSession() {
       sessionId: record.id,
       subject: session.subject,
       topic: session.topic,
-      subNote: session.subNote || '',
+      sub_topic: session.sub_topic || null,
       date: todayStr(),
       questions: validQuestions,
       created_at: new Date().toISOString(),
@@ -319,7 +318,7 @@ export async function endSession() {
   session.questionIndex = 0;
   session.questionElapsed = 0;
   session.mode = 'full';
-  session.subNote = '';
+  session.sub_topic = null;
 
   _ui.renderHome();
   _ui.renderProgress();

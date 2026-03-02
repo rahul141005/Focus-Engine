@@ -16,7 +16,7 @@ export function renderNoteCard(note, sessionMap, qaMap) {
   const session = note.sessionId ? sessionMap.get(note.sessionId) : null;
   const durationLabel = session ? fmtTime(session.duration_seconds) : '';
   const modeBadge = session && session.mode === 'perQuestion' ? 'Timed Q' : (session ? 'Full' : '');
-  const subNoteLabel = note.subNote || (session && session.subNote) || '';
+  const subTopicLabel = note.sub_topic || note.subNote || (session && (session.sub_topic || session.subNote)) || '';
 
   // Question breakdown via Map lookup (O(1))
   const qaRecord = note.sessionId ? qaMap.get(note.sessionId) : null;
@@ -45,7 +45,7 @@ export function renderNoteCard(note, sessionMap, qaMap) {
     <div class="note-card-header" onclick="App.toggleNoteExpand('${note.id}')">
       <div class="note-card-meta">
         <div class="note-card-subject" style="color:${color}">${esc(note.subject)}</div>
-        <div class="note-card-topic">${esc(note.topic)}${subNoteLabel ? ` <span class="note-card-subnote">· ${esc(subNoteLabel)}</span>` : ''}</div>
+        <div class="note-card-topic">${esc(note.topic)}${subTopicLabel ? ` <span class="note-card-subtopic">· ${esc(subTopicLabel)}</span>` : ''}</div>
         <div class="note-card-meta-row">
           ${dateLabel ? `<span class="note-card-date">${dateLabel}</span>` : ''}
           ${durationLabel ? `<span class="note-card-duration">${durationLabel}</span>` : ''}

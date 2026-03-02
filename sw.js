@@ -37,7 +37,7 @@ messaging.onBackgroundMessage(function(payload) {
   return self.registration.showNotification(title, options);
 });
 
-const CACHE_VERSION  = 'focus-engine-v8';
+const CACHE_VERSION  = 'focus-engine-v9';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',

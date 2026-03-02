@@ -11,10 +11,27 @@ export const FireDB = {
     return await Firebase.init();
   },
 
+  // Normalize legacy subNote → sub_topic for backward compatibility
+  _normalizeSubTopic(item) {
+    if (item.sub_topic === undefined) {
+      item.sub_topic = item.subNote || null;
+    }
+    return item;
+  },
+
   // Ensure document has required fields before saving
   _ensureFields(doc) {
     if (!doc.created_at) {
       doc.created_at = new Date().toISOString();
+    }
+    // Only normalize sub_topic for document types that use it
+    // (tasks, sessions, questionAnalytics, sessionNotes — NOT days or personalTasks)
+    if ('sub_topic' in doc || 'subNote' in doc) {
+      if (doc.sub_topic === undefined) {
+        doc.sub_topic = doc.subNote || null;
+      }
+      // Remove legacy subNote field from new writes
+      delete doc.subNote;
     }
     return doc;
   },
@@ -45,8 +62,11 @@ export const FireDB = {
     const remote = result.data || [];
     const localIds = new Set(state.tasks.map(t => t.id));
     for (const item of remote) {
+      FireDB._normalizeSubTopic(item);
       if (!localIds.has(item.id)) state.tasks.push(item);
     }
+    // Normalize existing local tasks
+    state.tasks.forEach(t => FireDB._normalizeSubTopic(t));
     DB.save();
     const remoteIds = new Set(remote.map(t => t.id));
     for (const item of state.tasks) {
@@ -64,8 +84,11 @@ export const FireDB = {
     const remote = result.data || [];
     const localIds = new Set(state.sessions.map(s => s.id));
     for (const item of remote) {
+      FireDB._normalizeSubTopic(item);
       if (!localIds.has(item.id)) state.sessions.push(item);
     }
+    // Normalize existing local sessions
+    state.sessions.forEach(s => FireDB._normalizeSubTopic(s));
     DB.save();
     const remoteIds = new Set(remote.map(s => s.id));
     for (const item of state.sessions) {
@@ -102,8 +125,10 @@ export const FireDB = {
     const remote = result.data || [];
     const localIds = new Set(state.questionAnalytics.map(q => q.id));
     for (const item of remote) {
+      FireDB._normalizeSubTopic(item);
       if (!localIds.has(item.id)) state.questionAnalytics.push(item);
     }
+    state.questionAnalytics.forEach(q => FireDB._normalizeSubTopic(q));
     DB.save();
     const remoteIds = new Set(remote.map(q => q.id));
     for (const item of state.questionAnalytics) {
@@ -121,8 +146,11 @@ export const FireDB = {
     const remote = result.data || [];
     const localIds = new Set(state.sessionNotes.map(n => n.id));
     for (const item of remote) {
+      FireDB._normalizeSubTopic(item);
       if (!localIds.has(item.id)) state.sessionNotes.push(item);
     }
+    // Normalize existing local session notes
+    state.sessionNotes.forEach(n => FireDB._normalizeSubTopic(n));
     DB.save();
     const remoteIds = new Set(remote.map(n => n.id));
     for (const item of state.sessionNotes) {
