@@ -20,7 +20,7 @@ import { renderPersonal, addPersonalTask, togglePersonalTask, deletePersonalTask
 import { toggleNoteExpand, toggleNoteQA, openEditNote, saveEditNote, deleteSessionNote, closeNoteModal } from './features/notesEngine.js';
 import { switchTab } from './ui/tabsController.js';
 import { closeSummary, showSessionSummary } from './ui/sessionView.js';
-import { startClock, updateClock } from './core/timerEngine.js';
+import { startClock, updateClock, stopSessionTimer } from './core/timerEngine.js';
 import {
   startSessionFlow, startSession, startSessionWithMode,
   pauseSession, endSession, switchSessionMode,
@@ -36,7 +36,7 @@ import {
 import {
   setBacklogSort, openReassign, reassignTask, undoReschedule,
 } from './features/backlogFeature.js';
-import { subscribeToPushNotifications, registerAnalyticsUI } from './services/analyticsService.js';
+import { subscribeToPushNotifications, registerAnalyticsUI, stopTokenRefresh } from './services/analyticsService.js';
 
 // ─── Motivational Quote Engine ─────────────────────────────────────────
 
@@ -74,6 +74,8 @@ function setTheme(theme, btn) {
 }
 
 async function saveFirebaseConfig() {
+  if (_dataCleared) return;
+
   showCloudStatus('Connecting...', 'info');
 
   const initResult = await FireDB.init();
@@ -82,6 +84,8 @@ async function saveFirebaseConfig() {
     showCloudStatus(`Connection failed: ${initResult.error}`, 'error');
     return;
   }
+
+  if (_dataCleared) return;
 
   showCloudStatus('Connected! Syncing data...', 'info');
 
@@ -93,6 +97,8 @@ async function saveFirebaseConfig() {
     FireDB.syncQuestionAnalytics(),
     FireDB.syncSessionNotes(),
   ]);
+
+  if (_dataCleared) return;
 
   const totalSynced =
     (daysResult.count || 0) +
@@ -126,23 +132,134 @@ function handleInstall() {
   }
 }
 
-function clearData() {
+let _dataCleared = false;
+
+async function clearData() {
   if (!confirm('Clear all local data? This cannot be undone.')) return;
-  state.days = [];
-  state.tasks = [];
-  state.sessions = [];
-  state.personalTasks = [];
-  state.questionAnalytics = [];
-  state.sessionNotes = [];
-  state.questionNotes = [];
-  state.rescheduledTopics = [];
-  DB.save();
-  renderHome();
-  renderPlan();
-  renderBacklog();
-  renderProgress();
-  renderPersonal();
-  toast('Data cleared');
+
+  const btn = document.getElementById('btnClearData');
+  if (btn) btn.disabled = true;
+
+  _dataCleared = true;
+
+  // End active session if running (prevent timer interval leak)
+  if (session.active) {
+    // Set active=false first to prevent tick from firing between flag set and clearInterval
+    session.active = false;
+    stopSessionTimer();
+    document.getElementById('sessionOverlay').classList.remove('active');
+    document.getElementById('perQuestionPanel').style.display = 'none';
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch((e) => console.debug('[FE] Fullscreen exit:', e));
+    } catch(e) {}
+  }
+
+  // Stop token refresh interval (prevent ghost push token writes)
+  stopTokenRefresh();
+
+  try {
+    // 1. Clear Firestore collections
+    try {
+      await FireDB.deleteAllCollections();
+    } catch (err) {
+      console.error('[FE] Firestore clear failed:', err);
+    }
+
+    // 2. Clear in-memory state — all data arrays
+    state.days = [];
+    state.tasks = [];
+    state.sessions = [];
+    state.personalTasks = [];
+    state.questionAnalytics = [];
+    state.sessionNotes = [];
+    state.questionNotes = [];
+    state.rescheduledTopics = [];
+    state.pushSubscription = null;
+    state.currentDayId = null;
+    state.reassignTaskId = null;
+    state.selectedSubject = null;
+
+    // 3. Reset settings to fresh-install defaults
+    state.settings = {
+      dayEndTime: '23:00',
+      dayStartTime: '06:00',
+      userName: '',
+      notifications: {
+        study: false,
+        brainFog: false,
+        evening: false,
+        personal: false,
+      },
+      sound: true,
+      theme: 'focus',
+    };
+
+    // 4. Reset session state
+    session.paused = false;
+    session.taskId = null;
+    session.subject = '';
+    session.topic = '';
+    session.sub_topic = null;
+    session.startTime = null;
+    session.pausedAt = null;
+    session.elapsed = 0;
+    session.mode = 'full';
+    session.questions = [];
+    session.questionIndex = 0;
+    session.currentQuestionStart = null;
+    session.questionElapsed = 0;
+
+    // 5. Reset transient app locals
+    appLocals.lastSessionRecord = null;
+    appLocals.csvParsedData = null;
+    appLocals.csvSelection = {};
+    appLocals.savingNotes = false;
+
+    // 6. Clear localStorage
+    localStorage.clear();
+
+    // 7. Clear IndexedDB (Firestore offline persistence cache)
+    try {
+      const dbs = await indexedDB.databases();
+      await Promise.all(
+        dbs.map(db => new Promise((resolve, reject) => {
+          const req = indexedDB.deleteDatabase(db.name);
+          req.onsuccess = resolve;
+          req.onerror = reject;
+          req.onblocked = () => {
+            console.warn('[FE] IndexedDB delete blocked for:', db.name);
+            resolve();
+          };
+        }))
+      );
+    } catch (err) {
+      console.warn('[FE] IndexedDB clear failed:', err);
+    }
+
+    // 8. Clear Service Worker caches
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    } catch (err) {
+      console.warn('[FE] Cache clear failed:', err);
+    }
+
+    // 9. Apply default theme and re-render all views
+    document.documentElement.dataset.theme = state.settings.theme;
+    renderHome();
+    renderPlan();
+    renderBacklog();
+    renderProgress();
+    renderPersonal();
+    renderSettings();
+    updateClock();
+    toast('All data cleared successfully', 'success');
+  } catch (err) {
+    console.error('[FE] Clear data error:', err);
+    toast('Error clearing data — please try again', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ─── Startup Error Display ─────────────────────────────────────────────
@@ -162,6 +279,8 @@ function showStartupError(phase, message) {
 // ─── Firebase Auto-Init ────────────────────────────────────────────────
 
 async function tryFirebaseInit() {
+  if (_dataCleared) return;
+
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -177,6 +296,7 @@ async function tryFirebaseInit() {
 
     if (result.success) {
       showCloudStatus('Connected to Firebase', 'success');
+      if (_dataCleared) return;
       try {
         await Promise.all([
           FireDB.syncDays(),
@@ -186,6 +306,21 @@ async function tryFirebaseInit() {
           FireDB.syncQuestionAnalytics(),
           FireDB.syncSessionNotes(),
         ]);
+        // Guard against race: if clear was triggered during sync,
+        // re-clear state to prevent ghost data resurrection
+        if (_dataCleared) {
+          state.days = [];
+          state.tasks = [];
+          state.sessions = [];
+          state.personalTasks = [];
+          state.questionAnalytics = [];
+          state.sessionNotes = [];
+          state.questionNotes = [];
+          state.rescheduledTopics = [];
+          state.pushSubscription = null;
+          localStorage.clear();
+          return;
+        }
         renderHome();
         renderPlan();
         renderBacklog();

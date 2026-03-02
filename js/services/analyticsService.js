@@ -12,6 +12,7 @@ import { Firebase } from '../services/firebaseService.js';
 let _toast = () => {};
 let _foregroundListenerRegistered = false;
 let _tokenRefreshRegistered = false;
+let _tokenRefreshIntervalId = null;
 
 const TOKEN_REFRESH_INTERVAL_MS = 3600000; // 1 hour
 
@@ -93,7 +94,7 @@ export async function subscribeToPushNotifications() {
       if (!_tokenRefreshRegistered) {
         _tokenRefreshRegistered = true;
         // Periodically check for token refresh (Firebase v9+ does not have onTokenRefresh)
-        setInterval(async () => {
+        _tokenRefreshIntervalId = setInterval(async () => {
           try {
             const refreshedToken = await getToken(Firebase.messaging, {
               vapidKey: FCM_VAPID_KEY,
@@ -119,4 +120,12 @@ export async function subscribeToPushNotifications() {
     console.error('[FCM] Push subscription error:', err);
     return { success: false, error: err.message };
   }
+}
+
+export function stopTokenRefresh() {
+  if (_tokenRefreshIntervalId) {
+    clearInterval(_tokenRefreshIntervalId);
+    _tokenRefreshIntervalId = null;
+  }
+  _tokenRefreshRegistered = false;
 }
