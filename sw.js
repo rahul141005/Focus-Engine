@@ -105,7 +105,7 @@ self.addEventListener('fetch', event => {
 
   // Skip non-GET, Firebase API calls, chrome-extension
   if (request.method !== 'GET') return;
-  if (url.hostname.includes('firebaseio.com') || url.hostname.includes('googleapis.com') || url.hostname.includes('gstatic.com')) return;
+  if (url.hostname.endsWith('.firebaseio.com') || url.hostname.endsWith('.googleapis.com') || url.hostname.endsWith('.gstatic.com')) return;
   if (url.protocol === 'chrome-extension:') return;
 
   // Navigation: network-first with fallback
