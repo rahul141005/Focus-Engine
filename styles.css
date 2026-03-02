@@ -2131,11 +2131,15 @@ input, textarea, select { font-family: var(--font-body); }
 .backlog-sort-select:focus { border-color: var(--indigo); }
 
 /* ─── Mode Switch Button (Feature 2) ──────── */
+.session-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 env(safe-area-inset-right, 0) 0 env(safe-area-inset-left, 0);
+}
 .btn-mode-switch {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: var(--indigo-dim);
+  background: transparent;
   border: 1px solid rgba(99,102,241,0.3);
   border-radius: 20px;
   padding: 6px 14px;
@@ -2145,7 +2149,7 @@ input, textarea, select { font-family: var(--font-body); }
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: background var(--transition), transform var(--transition-fast);
-  z-index: 10;
+  flex-shrink: 0;
 }
 .btn-mode-switch:active { background: rgba(99,102,241,0.25); transform: scale(0.95); }
 .session-top { position: relative; }
