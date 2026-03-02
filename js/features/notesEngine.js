@@ -58,10 +58,10 @@ export async function saveEditNote() {
   if (!note) return;
 
   note.text = text;
-  if (topic) note.topic = topic;
+  note.topic = topic;
 
   DB.save();
-  await Firebase.updateDoc('sessionNotes', id, { text: note.text, topic: note.topic });
+  await Firebase.updateDoc('sessionNotes', id, { text: note.text, topic: note.topic, subject: note.subject });
 
   closeNoteModal();
   renderPersonal();
