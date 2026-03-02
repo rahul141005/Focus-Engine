@@ -13,6 +13,12 @@ export function toggleNoteExpand(id) {
   if (card) card.classList.toggle('expanded');
 }
 
+export function toggleNoteQA(el) {
+  if (el && el.parentElement) {
+    el.parentElement.classList.toggle('open');
+  }
+}
+
 export function openEditNote(id) {
   const note = state.sessionNotes.find(n => n.id === id);
   if (!note) return;

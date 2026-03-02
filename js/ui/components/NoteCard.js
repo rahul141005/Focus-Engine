@@ -6,30 +6,30 @@ import { SUBJECT_COLORS } from '../../config/constants.js';
 import { esc, fmtTime, fmtMins } from '../../utils/formatUtils.js';
 import { parseLocalDate } from '../../utils/timeUtils.js';
 
-export function renderNoteCard(note) {
+export function renderNoteCard(note, sessions, questionAnalytics) {
   const color = SUBJECT_COLORS[note.subject] || SUBJECT_COLORS.Other;
   const dateLabel = note.date
     ? parseLocalDate(note.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : '';
 
   // Find matching session for duration & mode
-  const session = note.sessionId && window.__feState
-    ? window.__feState.sessions.find(s => s.id === note.sessionId)
+  const session = note.sessionId && sessions
+    ? sessions.find(s => s.id === note.sessionId)
     : null;
   const durationLabel = session ? fmtTime(session.duration_seconds) : '';
   const modeBadge = session && session.mode === 'perQuestion' ? 'Timed Q' : (session ? 'Full' : '');
   const subNoteLabel = note.subNote || (session && session.subNote) || '';
 
   // Question breakdown (if available from questionAnalytics)
-  const qaRecord = note.sessionId && window.__feState
-    ? window.__feState.questionAnalytics.find(q => q.sessionId === note.sessionId)
+  const qaRecord = note.sessionId && questionAnalytics
+    ? questionAnalytics.find(q => q.sessionId === note.sessionId)
     : null;
 
   let questionBreakdownHtml = '';
   if (qaRecord && qaRecord.questions && qaRecord.questions.length > 0) {
     const avgSecs = Math.round(qaRecord.questions.reduce((a, q) => a + q.seconds, 0) / qaRecord.questions.length);
     questionBreakdownHtml = `<div class="note-card-qa-section">
-      <div class="note-card-qa-toggle" onclick="event.stopPropagation(); this.parentElement.classList.toggle('open')">
+      <div class="note-card-qa-toggle" onclick="App.toggleNoteQA(this)">
         <svg class="note-card-qa-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,6 15,12 9,18"/></svg>
         <span>${qaRecord.questions.length} questions · avg ${fmtTime(avgSecs)}</span>
       </div>
