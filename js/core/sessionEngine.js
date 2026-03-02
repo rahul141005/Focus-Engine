@@ -26,6 +26,15 @@ export function registerSessionUI(callbacks) {
   Object.assign(_ui, callbacks);
 }
 
+function updateModeSegmentedControl(mode) {
+  const segFull = document.getElementById('segModeFull');
+  const segTimed = document.getElementById('segModeTimed');
+  if (segFull && segTimed) {
+    segFull.classList.toggle('active', mode === 'full');
+    segTimed.classList.toggle('active', mode === 'perQuestion');
+  }
+}
+
 function playEndTone() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -144,13 +153,7 @@ export function startSessionWithMode(mode) {
   document.getElementById('btnPauseSession').textContent = 'Pause';
   document.getElementById('sessionOverlay').classList.add('active');
 
-  // Update segmented mode control
-  const segFull = document.getElementById('segModeFull');
-  const segTimed = document.getElementById('segModeTimed');
-  if (segFull && segTimed) {
-    segFull.classList.toggle('active', mode === 'full');
-    segTimed.classList.toggle('active', mode === 'perQuestion');
-  }
+  updateModeSegmentedControl(mode);
 
   const pqPanel = document.getElementById('perQuestionPanel');
   if (mode === 'perQuestion') {
@@ -213,13 +216,7 @@ export function switchSessionMode() {
     document.getElementById('questionTimer').textContent = fmtTime(session.questionElapsed);
   }
 
-  // Update segmented mode control
-  const segFull2 = document.getElementById('segModeFull');
-  const segTimed2 = document.getElementById('segModeTimed');
-  if (segFull2 && segTimed2) {
-    segFull2.classList.toggle('active', session.mode === 'full');
-    segTimed2.classList.toggle('active', session.mode === 'perQuestion');
-  }
+  updateModeSegmentedControl(session.mode);
   _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
 }
 
