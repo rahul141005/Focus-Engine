@@ -204,7 +204,7 @@ export function switchSessionMode() {
   _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
 }
 
-export function endSession() {
+export async function endSession() {
   if (!session.active) return;
   session.active = false;
   stopSessionTimer();
@@ -260,7 +260,7 @@ export function endSession() {
     const sesMins = Math.floor(finalElapsed / 60);
     if (sesMins >= (task.estimated_minutes || 0) * 0.8) {
       task.status = 'completed';
-      Supa.updateTask(task.id, { status: 'completed' });
+      await Supa.updateTask(task.id, { status: 'completed' });
     }
   }
 
@@ -279,7 +279,7 @@ export function endSession() {
   }
 
   DB.save();
-  Supa.insertSession(record);
+  await Supa.insertSession(record);
 
   const summaryQuestions = session.questions.filter(q => q !== undefined);
   const summaryMode = session.mode;

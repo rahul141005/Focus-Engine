@@ -2,6 +2,13 @@
 //  FOCUS ENGINE — Routes & API Configuration
 // ═══════════════════════════════════════════════════════════════════════
 
-export const SUPABASE_URL = 'https://vfgcmesgcfbmokmaseht.supabase.co';
-export const SUPABASE_KEY = 'sb_publishable_rxg1Jo-WFkLJt21207wv3w_04eGdsGZ';
-export const VAPID_PUBLIC_KEY = 'BEy_F1htue07CuKuuZ9W_ona_4Jwer5MzMzBovAzYosHkzoWR4hKEPF3fuAHUCUgAGjgIq0dFgei9AqC_JqIuFI';
+export const FIREBASE_CONFIG = {
+  apiKey: 'FIREBASE_API_KEY',
+  authDomain: 'FIREBASE_AUTH_DOMAIN',
+  projectId: 'FIREBASE_PROJECT_ID',
+  storageBucket: 'FIREBASE_STORAGE_BUCKET',
+  messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
+  appId: 'FIREBASE_APP_ID',
+};
+
+export const FCM_VAPID_KEY = 'FIREBASE_FCM_VAPID_KEY';

@@ -30,7 +30,7 @@ export function selectSubject(btn) {
   state.selectedSubject = btn.dataset.subj;
 }
 
-export function saveTask() {
+export async function saveTask() {
   if (!state.currentDayId) { toast('No day selected','error'); return; }
   const subj  = state.selectedSubject;
   const topic = document.getElementById('inputTaskTopic').value.trim();
@@ -47,38 +47,38 @@ export function saveTask() {
 
   state.tasks.push(task);
   DB.save();
-  Supa.insertTask(task);
+  await Supa.insertTask(task);
   closeSheet();
   renderPlan();
   renderHome();
   toast('Task added', 'success');
 }
 
-export function toggleTask(taskId) {
+export async function toggleTask(taskId) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task) return;
   task.status = task.status === 'completed' ? 'pending' : 'completed';
   if (task.status === 'completed' && navigator.vibrate) navigator.vibrate(30);
   DB.save();
-  Supa.updateTask(taskId, { status: task.status });
+  await Supa.updateTask(taskId, { status: task.status });
   renderPlan();
   renderHome();
   renderBacklog();
 }
 
-export function deleteTask(taskId) {
+export async function deleteTask(taskId) {
   if (!confirm('Delete this task?')) return;
 
   state.tasks = state.tasks.filter(t => t.id !== taskId);
   DB.save();
-  Supa.deleteTask(taskId);
+  await Supa.deleteTask(taskId);
   renderPlan();
   renderHome();
   renderBacklog();
   toast('Task removed');
 }
 
-export function toggleEditTask(taskId) {
+export async function toggleEditTask(taskId) {
   const taskItem = document.querySelector(`[data-task-id="${taskId}"]`);
   if (!taskItem) return;
 
@@ -112,7 +112,7 @@ export function toggleEditTask(taskId) {
       task.topic = newTopic;
       task.estimated_minutes = newMins;
       DB.save();
-      Supa.updateTask(taskId, { topic: newTopic, estimated_minutes: newMins });
+      await Supa.updateTask(taskId, { topic: newTopic, estimated_minutes: newMins });
       toast('Task updated', 'success');
     }
 
@@ -141,7 +141,7 @@ export function toggleEditTask(taskId) {
 
 // ─── Day Management ────────────────────────────────────────────────────
 
-export function saveDay() {
+export async function saveDay() {
   const label = document.getElementById('inputDayLabel').value.trim();
   const date  = document.getElementById('inputDayDate').value;
   if (!label) { toast('Enter a label', 'error'); return; }
@@ -149,14 +149,14 @@ export function saveDay() {
   const day = { id: uid(), label, date: date || null, created_at: new Date().toISOString() };
   state.days.push(day);
   DB.save();
-  Supa.insertDay(day);
+  await Supa.insertDay(day);
   closeSheet();
   renderPlan();
   renderHome();
   toast('Day added', 'success');
 }
 
-export function toggleEditDay(dayId) {
+export async function toggleEditDay(dayId) {
   const labelEl = document.querySelector(`[data-day-id="${dayId}"][data-field="label"]`);
   if (!labelEl) return;
 
@@ -173,7 +173,7 @@ export function toggleEditDay(dayId) {
     if (day) {
       day.label = newLabel;
       DB.save();
-      Supa.updateDay(dayId, { label: newLabel });
+      await Supa.updateDay(dayId, { label: newLabel });
       toast('Day label updated', 'success');
     }
 
@@ -195,7 +195,7 @@ export function toggleEditDay(dayId) {
   }
 }
 
-export function deleteDay(dayId) {
+export async function deleteDay(dayId) {
   const day = state.days.find(d => d.id === dayId);
   if (!day) return;
 
@@ -208,8 +208,8 @@ export function deleteDay(dayId) {
   state.days = state.days.filter(d => d.id !== dayId);
 
   DB.save();
-  Promise.all(tasksToDelete.map(t => Supa.deleteTask(t.id)))
-    .then(() => Supa.deleteDay(dayId));
+  await Promise.all(tasksToDelete.map(t => Supa.deleteTask(t.id)));
+  await Supa.deleteDay(dayId);
 
   renderPlan();
   renderHome();
@@ -417,7 +417,7 @@ export async function confirmCSVImport() {
     };
 
     state.days.push(day);
-    Supa.insertDay(day).catch(e => console.warn('[Supa] day insert failed:', e));
+    await Supa.insertDay(day);
     addedDays++;
 
     const stepNum = totalDays > 0 ? Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1) : 1;
@@ -435,7 +435,7 @@ export async function confirmCSVImport() {
         created_at: new Date().toISOString()
       };
       state.tasks.push(task);
-      Supa.insertTask(task).catch(e => console.warn('[Supa] task insert failed:', e));
+      await Supa.insertTask(task);
       addedTasks++;
     }
   }

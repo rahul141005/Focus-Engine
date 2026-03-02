@@ -4,7 +4,7 @@
  * Implements: Offline caching, Push notifications, Background sync
  */
 
-const CACHE_VERSION  = 'focus-engine-v3';
+const CACHE_VERSION  = 'focus-engine-v4';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',
@@ -22,6 +22,7 @@ const STATIC_ASSETS  = [
   '/js/core/questionEngine.js',
   '/js/services/storageService.js',
   '/js/services/databaseService.js',
+  '/js/services/firebaseService.js',
   '/js/services/analyticsService.js',
   '/js/ui/renderEngine.js',
   '/js/ui/sessionView.js',
@@ -102,9 +103,9 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET, supabase API calls, chrome-extension
+  // Skip non-GET, Firebase API calls, chrome-extension
   if (request.method !== 'GET') return;
-  if (url.hostname.includes('supabase.co')) return;
+  if (url.hostname.includes('firebaseio.com') || url.hostname.includes('googleapis.com') || url.hostname.includes('gstatic.com')) return;
   if (url.protocol === 'chrome-extension:') return;
 
   // Navigation: network-first with fallback
@@ -198,7 +199,7 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
-// ─── Background sync (for queued Supabase writes when offline) ────────────────
+// ─── Background sync (for queued Firebase writes when offline) ────────────────
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-sessions') {
     event.waitUntil(syncPendingData());
@@ -207,7 +208,7 @@ self.addEventListener('sync', event => {
 
 async function syncPendingData() {
   // In a full implementation, this would read from IndexedDB
-  // and push queued writes to Supabase when connectivity is restored
+  // and push queued writes to Firebase when connectivity is restored
   console.log('[SW] Background sync: syncing pending data');
 }
 

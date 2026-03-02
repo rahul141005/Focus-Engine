@@ -85,7 +85,7 @@ export function renderPersonal() {
   }
 }
 
-export function addPersonalTask() {
+export async function addPersonalTask() {
   const input = document.getElementById('personalInput');
   if (!input) return;
   const text = input.value.trim();
@@ -109,7 +109,7 @@ export function addPersonalTask() {
 
   state.personalTasks.push(task);
   DB.save();
-  Supa.insertPersonalTask(task);
+  await Supa.insertPersonalTask(task);
 
   input.value = '';
   document.querySelectorAll('#personalFrequencyChips .personal-chip').forEach(c => c.classList.toggle('active', c.dataset.frequency === 'once'));
@@ -118,7 +118,7 @@ export function addPersonalTask() {
   toast('Personal task added');
 }
 
-export function togglePersonalTask(id) {
+export async function togglePersonalTask(id) {
   const task = state.personalTasks.find(t => t.id === id);
   if (!task) return;
 
@@ -146,20 +146,20 @@ export function togglePersonalTask(id) {
         priority: task.priority || 'none',
       };
       state.personalTasks.push(newTask);
-      Supa.insertPersonalTask(newTask);
+      await Supa.insertPersonalTask(newTask);
     }
   }
 
   DB.save();
-  Supa.updatePersonalTask(id, { completed: task.completed });
+  await Supa.updatePersonalTask(id, { completed: task.completed });
   renderPersonal();
 }
 
-export function deletePersonalTask(id) {
+export async function deletePersonalTask(id) {
   if (!confirm('Delete this personal task?')) return;
 
   state.personalTasks = state.personalTasks.filter(t => t.id !== id);
   DB.save();
-  Supa.deletePersonalTask(id);
+  await Supa.deletePersonalTask(id);
   renderPersonal();
 }
