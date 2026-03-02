@@ -57,18 +57,22 @@ export async function subscribeToPushNotifications() {
 
     // Handle foreground messages (background handled by SW)
     if (!_foregroundListenerRegistered) {
-      onMessage(Firebase.messaging, (payload) => {
-        const title = payload.notification?.title || 'Focus Engine';
-        const body = payload.notification?.body || 'Stay on track.';
-        if (Notification.permission === 'granted') {
-          new Notification(title, {
-            body,
-            icon: '/icons/icon-192.png',
-            badge: '/icons/icon-192.png',
-          });
-        }
-      });
-      _foregroundListenerRegistered = true;
+      try {
+        onMessage(Firebase.messaging, (payload) => {
+          const title = payload.notification?.title || 'Focus Engine';
+          const body = payload.notification?.body || 'Stay on track.';
+          if (Notification.permission === 'granted') {
+            new Notification(title, {
+              body,
+              icon: '/icons/icon-192.png',
+              badge: '/icons/icon-192.png',
+            });
+          }
+        });
+        _foregroundListenerRegistered = true;
+      } catch (listenerErr) {
+        console.warn('[FCM] foreground listener registration failed:', listenerErr);
+      }
     }
 
     const result = await FireDB.savePushToken(token);
