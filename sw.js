@@ -20,11 +20,15 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function(payload) {
-  const title = payload.notification?.title || 'Focus Engine';
+  // If payload.notification exists, Firebase SDK already auto-showed it — do NOT show again
+  if (payload.notification) return;
+
+  // Data-only message — show notification manually with safe fallbacks
+  const title = payload.data?.title || 'Focus Engine';
   const options = {
-    body: payload.notification?.body || 'Stay on track.',
+    body: payload.data?.body || 'Stay on track.',
     icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    badge: '/icons/icon-72.png',
     vibrate: [100, 50, 100],
     data: { url: '/', timestamp: Date.now() },
     requireInteraction: false,
@@ -180,19 +184,32 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ─── Push notification handler ────────────────────────────────────────────────
+// ─── Push notification handler (non-FCM push events only) ─────────────────────
 self.addEventListener('push', event => {
-  let data = { title: 'Focus Engine', body: 'Stay on track.' };
+  // FCM pushes are handled by Firebase SDK + onBackgroundMessage above.
+  // This handler catches non-FCM web push events only.
+  let data;
   try {
-    data = event.data.json();
+    data = event.data?.json();
   } catch(e) {
-    try { data.body = event.data.text(); } catch(_) {}
+    try {
+      const text = event.data?.text();
+      data = { title: 'Focus Engine', body: text || 'Stay on track.' };
+    } catch(_) {
+      data = { title: 'Focus Engine', body: 'Stay on track.' };
+    }
   }
 
+  // Skip if this is an FCM message (has 'from' or 'gcm.message_id' fields)
+  if (data && (data.from || data['gcm.message_id'])) return;
+
+  const title = data?.notification?.title || data?.title || 'Focus Engine';
+  const body  = data?.notification?.body  || data?.body  || 'Stay on track.';
+
   const options = {
-    body:    data.body,
+    body,
     icon:    '/icons/icon-192.png',
-    badge:   '/icons/icon-192.png',
+    badge:   '/icons/icon-72.png',
     vibrate: [100, 50, 100],
     data:    { url: '/', timestamp: Date.now() },
     actions: [
@@ -204,7 +221,7 @@ self.addEventListener('push', event => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.registration.showNotification(title, options)
   );
 });
 
@@ -255,7 +272,7 @@ self.addEventListener('message', event => {
       self.registration.showNotification(msg.title, {
         body:    msg.body,
         icon:    '/icons/icon-192.png',
-        badge:   '/icons/icon-192.png',
+        badge:   '/icons/icon-72.png',
         vibrate: [100, 50, 100],
         silent:  false,
       });

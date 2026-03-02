@@ -59,13 +59,14 @@ export async function subscribeToPushNotifications() {
     if (!_foregroundListenerRegistered) {
       try {
         onMessage(Firebase.messaging, (payload) => {
-          const title = payload.notification?.title || 'Focus Engine';
-          const body = payload.notification?.body || 'Stay on track.';
+          // Use safe fallbacks: notification fields → data fields → defaults
+          const title = payload.notification?.title || payload.data?.title || 'Focus Engine';
+          const body  = payload.notification?.body  || payload.data?.body  || 'Stay on track.';
           if (Notification.permission === 'granted') {
             new Notification(title, {
               body,
               icon: '/icons/icon-192.png',
-              badge: '/icons/icon-192.png',
+              // badge omitted: not supported in foreground Notification() constructor
             });
           }
         });
@@ -73,6 +74,11 @@ export async function subscribeToPushNotifications() {
       } catch (listenerErr) {
         console.warn('[FCM] foreground listener registration failed:', listenerErr);
       }
+    }
+
+    // Avoid duplicate token writes — skip if token unchanged
+    if (state.pushSubscription?.token === token) {
+      return { success: true, token };
     }
 
     const result = await FireDB.savePushToken(token);
