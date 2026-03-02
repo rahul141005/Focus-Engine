@@ -13,6 +13,8 @@ let _toast = () => {};
 let _foregroundListenerRegistered = false;
 let _tokenRefreshRegistered = false;
 
+const TOKEN_REFRESH_INTERVAL_MS = 3600000; // 1 hour
+
 export function registerAnalyticsUI(toastFn) {
   _toast = toastFn;
 }
@@ -106,7 +108,7 @@ export async function subscribeToPushNotifications() {
           } catch (e) {
             console.warn('[FCM] Token refresh check failed:', e);
           }
-        }, 3600000); // Check every hour
+        }, TOKEN_REFRESH_INTERVAL_MS);
       }
 
       return { success: true, token };

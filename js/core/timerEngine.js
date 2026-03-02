@@ -73,6 +73,8 @@ export function startSessionTimer() {
   session.timerRef = setInterval(tickSession, 1000);
 
   // Guard against background tab freeze — recalculate on visibility restore
+  // Remove before adding to prevent duplicate listeners
+  document.removeEventListener('visibilitychange', _onVisibilityChange);
   document.addEventListener('visibilitychange', _onVisibilityChange);
 }
 

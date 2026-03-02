@@ -108,7 +108,8 @@ export const Firebase = {
     if (!_db || !_firestore) return { success: false, error: 'Not connected' };
     try {
       const { doc, setDoc } = _firestore;
-      // Use merge:true for partial updates to avoid overwriting entire documents
+      // Use setDoc with merge:true instead of updateDoc to safely handle
+      // documents that may not exist yet (e.g., after offline creation)
       const cleanUpdates = Firebase._stripUndefined(updates);
       await setDoc(doc(_db, collectionName, id), cleanUpdates, { merge: true });
       return { success: true, data: cleanUpdates };
