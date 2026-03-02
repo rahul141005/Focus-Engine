@@ -114,6 +114,25 @@ export const FireDB = {
     return { success: true, data: state.questionAnalytics, count: state.questionAnalytics.length };
   },
 
+  async syncSessionNotes() {
+    const result = await Firebase.getAll('sessionNotes');
+    if (!result.success) return result;
+
+    const remote = result.data || [];
+    const localIds = new Set(state.sessionNotes.map(n => n.id));
+    for (const item of remote) {
+      if (!localIds.has(item.id)) state.sessionNotes.push(item);
+    }
+    DB.save();
+    const remoteIds = new Set(remote.map(n => n.id));
+    for (const item of state.sessionNotes) {
+      if (!remoteIds.has(item.id)) {
+        await Firebase.setDoc('sessionNotes', item.id, item);
+      }
+    }
+    return { success: true, data: state.sessionNotes, count: state.sessionNotes.length };
+  },
+
   async insertDay(day) {
     return await Firebase.setDoc('days', day.id, FireDB._ensureFields(day));
   },

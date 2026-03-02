@@ -58,5 +58,4 @@ export const appLocals = {
   csvSelection: {},
   lastSessionRecord: null,
   savingNotes: false,
-  planSearchTimer: null,
 };

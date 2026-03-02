@@ -15,8 +15,6 @@ export function showSessionSummary(record, questions, mode) {
   const overlay = document.getElementById('sessionSummaryOverlay');
   if (!statsEl || !detailsEl || !overlay) return;
   if (!Array.isArray(questions)) questions = [];
-  const totalMins = Math.floor(record.duration_seconds / 60);
-  const totalSecs = record.duration_seconds % 60;
 
   let statsHtml = `
     <div class="summary-stat-card">

@@ -441,7 +441,8 @@ export async function confirmCSVImport() {
         day_id: day.id,
         subject: row.subject.trim(),
         topic: row.topic.trim(),
-        estimated_minutes: parseInt(row.estimated_minutes),
+        subNote: row.subnote ? row.subnote.trim() : '',
+        estimated_minutes: parseInt(row.estimated_minutes) || 0,
         status: 'pending',
         created_at: new Date().toISOString()
       };

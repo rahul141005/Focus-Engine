@@ -85,12 +85,13 @@ async function saveFirebaseConfig() {
 
   showCloudStatus('Connected! Syncing data...', 'info');
 
-  const [daysResult, tasksResult, sessionsResult, personalResult, analyticsResult] = await Promise.all([
+  const [daysResult, tasksResult, sessionsResult, personalResult, analyticsResult, notesResult] = await Promise.all([
     FireDB.syncDays(),
     FireDB.syncTasks(),
     FireDB.syncSessions(),
     FireDB.syncPersonalTasks(),
     FireDB.syncQuestionAnalytics(),
+    FireDB.syncSessionNotes(),
   ]);
 
   const totalSynced =
@@ -98,7 +99,8 @@ async function saveFirebaseConfig() {
     (tasksResult.count || 0) +
     (sessionsResult.count || 0) +
     (personalResult.count || 0) +
-    (analyticsResult.count || 0);
+    (analyticsResult.count || 0) +
+    (notesResult.count || 0);
 
   if (totalSynced === 0) {
     showCloudStatus('Already Synced', 'info');
@@ -143,9 +145,8 @@ function clearData() {
   toast('Data cleared');
 }
 
-// ─── Startup Phase Tracking ────────────────────────────────────────────
+// ─── Startup Error Display ─────────────────────────────────────────────
 
-const STARTUP_PHASES = ['INIT_FIREBASE', 'INIT_DB', 'HYDRATE_STATE', 'INIT_PUSH', 'RENDER_APP'];
 const STARTUP_TIMEOUT_MS = 15000;
 
 function showStartupError(phase, message) {
@@ -183,6 +184,7 @@ async function tryFirebaseInit() {
           FireDB.syncSessions(),
           FireDB.syncPersonalTasks(),
           FireDB.syncQuestionAnalytics(),
+          FireDB.syncSessionNotes(),
         ]);
         renderHome();
         renderPlan();
