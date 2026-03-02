@@ -166,7 +166,10 @@ async function clearData() {
           const req = indexedDB.deleteDatabase(db.name);
           req.onsuccess = resolve;
           req.onerror = reject;
-          req.onblocked = resolve;
+          req.onblocked = () => {
+            console.warn('[FE] IndexedDB delete blocked for:', db.name);
+            resolve();
+          };
         }))
       );
     } catch (err) {
