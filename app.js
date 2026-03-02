@@ -1869,6 +1869,9 @@ const App = (() => {
   function showSessionSummary(record, questions, mode) {
     const statsEl = document.getElementById('summaryStats');
     const detailsEl = document.getElementById('summaryDetails');
+    const overlay = document.getElementById('sessionSummaryOverlay');
+    if (!statsEl || !detailsEl || !overlay) return;
+    if (!Array.isArray(questions)) questions = [];
     const totalMins = Math.floor(record.duration_seconds / 60);
     const totalSecs = record.duration_seconds % 60;
 
@@ -1920,7 +1923,7 @@ const App = (() => {
 
     // Store record reference for saving notes on close
     lastSessionRecord = record;
-    document.getElementById('sessionSummaryOverlay').classList.add('active');
+    overlay.classList.add('active');
   }
 
   function closeSummary() {
