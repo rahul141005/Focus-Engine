@@ -1,10 +1,39 @@
 /**
  * Focus Engine — Service Worker
  * Strategy: Cache-first for assets, network-first for API calls
- * Implements: Offline caching, Push notifications, Background sync
+ * Implements: Offline caching, Push notifications (FCM), Background sync
  */
 
-const CACHE_VERSION  = 'focus-engine-v4';
+// ─── Firebase Cloud Messaging (background push) ─────────────────────────────
+importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: 'FIREBASE_API_KEY',
+  authDomain: 'FIREBASE_AUTH_DOMAIN',
+  projectId: 'FIREBASE_PROJECT_ID',
+  storageBucket: 'FIREBASE_STORAGE_BUCKET',
+  messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
+  appId: 'FIREBASE_APP_ID',
+});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage(function(payload) {
+  const title = payload.notification?.title || 'Focus Engine';
+  const options = {
+    body: payload.notification?.body || 'Stay on track.',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: [100, 50, 100],
+    data: { url: '/', timestamp: Date.now() },
+    requireInteraction: false,
+    silent: false,
+  };
+  return self.registration.showNotification(title, options);
+});
+
+const CACHE_VERSION  = 'focus-engine-v5';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',

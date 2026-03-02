@@ -7,7 +7,7 @@ import { state, session, appLocals } from './core/appState.js';
 import { QUOTES } from './config/constants.js';
 import { todayStr } from './utils/timeUtils.js';
 import { DB } from './services/storageService.js';
-import { Supa } from './services/databaseService.js';
+import { FireDB } from './services/databaseService.js';
 import { toast } from './ui/toastController.js';
 import { openSheet, closeSheet } from './ui/modalController.js';
 import {
@@ -75,7 +75,7 @@ function setTheme(theme, btn) {
 async function saveFirebaseConfig() {
   showCloudStatus('Connecting...', 'info');
 
-  const initResult = await Supa.init();
+  const initResult = await FireDB.init();
 
   if (!initResult.success) {
     showCloudStatus(`Connection failed: ${initResult.error}`, 'error');
@@ -85,11 +85,11 @@ async function saveFirebaseConfig() {
   showCloudStatus('Connected! Syncing data...', 'info');
 
   const [daysResult, tasksResult, sessionsResult, personalResult, analyticsResult] = await Promise.all([
-    Supa.syncDays(),
-    Supa.syncTasks(),
-    Supa.syncSessions(),
-    Supa.syncPersonalTasks(),
-    Supa.syncQuestionAnalytics(),
+    FireDB.syncDays(),
+    FireDB.syncTasks(),
+    FireDB.syncSessions(),
+    FireDB.syncPersonalTasks(),
+    FireDB.syncQuestionAnalytics(),
   ]);
 
   const totalSynced =
@@ -145,15 +145,15 @@ function clearData() {
 // ─── Firebase Auto-Init ────────────────────────────────────────────────
 
 async function tryFirebaseInit() {
-  const result = await Supa.init();
+  const result = await FireDB.init();
   if (result.success) {
     showCloudStatus('Connected to Firebase', 'success');
     Promise.all([
-      Supa.syncDays(),
-      Supa.syncTasks(),
-      Supa.syncSessions(),
-      Supa.syncPersonalTasks(),
-      Supa.syncQuestionAnalytics(),
+      FireDB.syncDays(),
+      FireDB.syncTasks(),
+      FireDB.syncSessions(),
+      FireDB.syncPersonalTasks(),
+      FireDB.syncQuestionAnalytics(),
     ]).then(() => {
       renderHome();
       renderPlan();

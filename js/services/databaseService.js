@@ -6,7 +6,7 @@ import { state } from '../core/appState.js';
 import { DB } from './storageService.js';
 import { Firebase } from './firebaseService.js';
 
-export const Supa = {
+export const FireDB = {
   async init() {
     return await Firebase.init();
   },
@@ -144,6 +144,10 @@ export const Supa = {
 
   async deletePersonalTask(id) {
     return await Firebase.deleteDoc('personalTasks', id);
+  },
+
+  async insertQuestionAnalytics(record) {
+    return await Firebase.setDoc('questionAnalytics', record.id, record);
   },
 
   async savePushToken(token) {

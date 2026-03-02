@@ -8,7 +8,7 @@ import { SUBJECT_COLORS, MIN_SESSION_SECONDS } from '../config/constants.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
 import { fmtTime, fmtMins, esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
 import { startSessionTimer, stopSessionTimer } from './timerEngine.js';
 
 // ─── UI callbacks injected by bootstrap (avoids core→ui dependency) ────
@@ -260,7 +260,7 @@ export async function endSession() {
     const sesMins = Math.floor(finalElapsed / 60);
     if (sesMins >= (task.estimated_minutes || 0) * 0.8) {
       task.status = 'completed';
-      await Supa.updateTask(task.id, { status: 'completed' });
+      await FireDB.updateTask(task.id, { status: 'completed' });
     }
   }
 
@@ -276,10 +276,13 @@ export async function endSession() {
       created_at: new Date().toISOString(),
     };
     state.questionAnalytics.push(qaRecord);
+    DB.save();
+    await FireDB.insertSession(record);
+    await FireDB.insertQuestionAnalytics(qaRecord);
+  } else {
+    DB.save();
+    await FireDB.insertSession(record);
   }
-
-  DB.save();
-  await Supa.insertSession(record);
 
   const summaryQuestions = session.questions.filter(q => q !== undefined);
   const summaryMode = session.mode;

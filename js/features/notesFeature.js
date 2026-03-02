@@ -7,7 +7,7 @@ import { SUBJECT_COLORS, MAX_DISPLAYED_NOTES } from '../config/constants.js';
 import { uid, todayStr, parseLocalDate } from '../utils/timeUtils.js';
 import { esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
 import { toast } from '../ui/toastController.js';
 
 export function renderPersonal() {
@@ -109,7 +109,7 @@ export async function addPersonalTask() {
 
   state.personalTasks.push(task);
   DB.save();
-  await Supa.insertPersonalTask(task);
+  await FireDB.insertPersonalTask(task);
 
   input.value = '';
   document.querySelectorAll('#personalFrequencyChips .personal-chip').forEach(c => c.classList.toggle('active', c.dataset.frequency === 'once'));
@@ -146,12 +146,12 @@ export async function togglePersonalTask(id) {
         priority: task.priority || 'none',
       };
       state.personalTasks.push(newTask);
-      await Supa.insertPersonalTask(newTask);
+      await FireDB.insertPersonalTask(newTask);
     }
   }
 
   DB.save();
-  await Supa.updatePersonalTask(id, { completed: task.completed });
+  await FireDB.updatePersonalTask(id, { completed: task.completed });
   renderPersonal();
 }
 
@@ -160,6 +160,6 @@ export async function deletePersonalTask(id) {
 
   state.personalTasks = state.personalTasks.filter(t => t.id !== id);
   DB.save();
-  await Supa.deletePersonalTask(id);
+  await FireDB.deletePersonalTask(id);
   renderPersonal();
 }

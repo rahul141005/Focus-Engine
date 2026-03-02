@@ -1,6 +1,7 @@
 /**
- * Focus Engine — Firebase Messaging Service Worker
- * Handles background push notifications via Firebase Cloud Messaging
+ * Focus Engine — Firebase Messaging Service Worker (compatibility stub)
+ * FCM messaging is handled by the main service worker (sw.js).
+ * This file exists at root for Firebase SDK auto-discovery compatibility.
  */
 
 importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js');
@@ -25,30 +26,8 @@ messaging.onBackgroundMessage(function(payload) {
     badge: '/icons/icon-192.png',
     vibrate: [100, 50, 100],
     data: { url: '/', timestamp: Date.now() },
-    actions: [
-      { action: 'open', title: 'Open App' },
-      { action: 'dismiss', title: 'Later' },
-    ],
     requireInteraction: false,
     silent: false,
   };
-
   return self.registration.showNotification(title, options);
-});
-
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-
-  if (event.action === 'dismiss') return;
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      return clients.openWindow('/');
-    })
-  );
 });

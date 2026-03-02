@@ -5,7 +5,7 @@
 import { state } from '../core/appState.js';
 import { FCM_VAPID_KEY } from '../config/routes.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
 import { Firebase } from '../services/firebaseService.js';
 
 // ─── UI callback injected by bootstrap (avoids services→ui dependency) ─
@@ -54,7 +54,7 @@ export async function subscribeToPushNotifications() {
       return { success: false, error: 'No FCM token received' };
     }
 
-    const result = await Supa.savePushToken(token);
+    const result = await FireDB.savePushToken(token);
 
     if (result.success) {
       state.pushSubscription = { token };

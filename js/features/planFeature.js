@@ -8,7 +8,7 @@ import { uid, todayStr } from '../utils/timeUtils.js';
 import { fmtMins, esc } from '../utils/formatUtils.js';
 import { debounce } from '../utils/debounce.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
 import { toast } from '../ui/toastController.js';
 import { openSheet, closeSheet } from '../ui/modalController.js';
 import { renderPlan, renderHome, renderBacklog, renderCSVSelectionList } from '../ui/renderEngine.js';
@@ -47,7 +47,7 @@ export async function saveTask() {
 
   state.tasks.push(task);
   DB.save();
-  await Supa.insertTask(task);
+  await FireDB.insertTask(task);
   closeSheet();
   renderPlan();
   renderHome();
@@ -60,7 +60,7 @@ export async function toggleTask(taskId) {
   task.status = task.status === 'completed' ? 'pending' : 'completed';
   if (task.status === 'completed' && navigator.vibrate) navigator.vibrate(30);
   DB.save();
-  await Supa.updateTask(taskId, { status: task.status });
+  await FireDB.updateTask(taskId, { status: task.status });
   renderPlan();
   renderHome();
   renderBacklog();
@@ -71,7 +71,7 @@ export async function deleteTask(taskId) {
 
   state.tasks = state.tasks.filter(t => t.id !== taskId);
   DB.save();
-  await Supa.deleteTask(taskId);
+  await FireDB.deleteTask(taskId);
   renderPlan();
   renderHome();
   renderBacklog();
@@ -112,7 +112,7 @@ export async function toggleEditTask(taskId) {
       task.topic = newTopic;
       task.estimated_minutes = newMins;
       DB.save();
-      await Supa.updateTask(taskId, { topic: newTopic, estimated_minutes: newMins });
+      await FireDB.updateTask(taskId, { topic: newTopic, estimated_minutes: newMins });
       toast('Task updated', 'success');
     }
 
@@ -149,7 +149,7 @@ export async function saveDay() {
   const day = { id: uid(), label, date: date || null, created_at: new Date().toISOString() };
   state.days.push(day);
   DB.save();
-  await Supa.insertDay(day);
+  await FireDB.insertDay(day);
   closeSheet();
   renderPlan();
   renderHome();
@@ -173,7 +173,7 @@ export async function toggleEditDay(dayId) {
     if (day) {
       day.label = newLabel;
       DB.save();
-      await Supa.updateDay(dayId, { label: newLabel });
+      await FireDB.updateDay(dayId, { label: newLabel });
       toast('Day label updated', 'success');
     }
 
@@ -208,8 +208,8 @@ export async function deleteDay(dayId) {
   state.days = state.days.filter(d => d.id !== dayId);
 
   DB.save();
-  await Promise.all(tasksToDelete.map(t => Supa.deleteTask(t.id)));
-  await Supa.deleteDay(dayId);
+  await Promise.all(tasksToDelete.map(t => FireDB.deleteTask(t.id)));
+  await FireDB.deleteDay(dayId);
 
   renderPlan();
   renderHome();
@@ -417,7 +417,7 @@ export async function confirmCSVImport() {
     };
 
     state.days.push(day);
-    await Supa.insertDay(day);
+    await FireDB.insertDay(day);
     addedDays++;
 
     const stepNum = totalDays > 0 ? Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1) : 1;
@@ -435,7 +435,7 @@ export async function confirmCSVImport() {
         created_at: new Date().toISOString()
       };
       state.tasks.push(task);
-      await Supa.insertTask(task);
+      await FireDB.insertTask(task);
       addedTasks++;
     }
   }

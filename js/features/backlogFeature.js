@@ -6,7 +6,7 @@ import { state, appLocals } from '../core/appState.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
 import { esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
 import { toast } from '../ui/toastController.js';
 import { openSheet, closeSheet } from '../ui/modalController.js';
 import { renderBacklog, renderHome, renderPlan } from '../ui/renderEngine.js';
@@ -43,7 +43,7 @@ export async function reassignTask(dayId) {
     });
     task.day_id = dayId;
     DB.save();
-    await Supa.updateTask(task.id, { day_id: dayId });
+    await FireDB.updateTask(task.id, { day_id: dayId });
   }
   closeSheet();
   renderBacklog();
@@ -57,7 +57,7 @@ export async function undoReschedule(rescheduleId) {
   const task = state.tasks.find(t => t.id === entry.taskId);
   if (task) {
     task.day_id = entry.originalDayId;
-    await Supa.updateTask(task.id, { day_id: entry.originalDayId });
+    await FireDB.updateTask(task.id, { day_id: entry.originalDayId });
   }
   state.rescheduledTopics = state.rescheduledTopics.filter(r => r.id !== rescheduleId);
   DB.save();
