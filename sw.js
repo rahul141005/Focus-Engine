@@ -4,10 +4,11 @@
  * Implements: Offline caching, Push notifications, Background sync
  */
 
-const CACHE_VERSION  = 'focus-engine-v2';
+const CACHE_VERSION  = 'focus-engine-v3';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',
+  '/styles.css',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
