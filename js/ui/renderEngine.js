@@ -321,13 +321,13 @@ export function toggleSubjectAnalytics(subjKey) {
   if (card) card.classList.toggle('expanded');
 }
 
-// ─── Supabase Status Display ───────────────────────────────────────────
+// ─── Cloud Status Display ──────────────────────────────────────────────
 
-export function showSupabaseStatus(message, type) {
-  const statusEl = document.getElementById('supabaseStatus');
+export function showCloudStatus(message, type) {
+  const statusEl = document.getElementById('cloudStatus');
   if (!statusEl) return;
   statusEl.textContent = message;
-  statusEl.className = `supabase-status ${type}`;
+  statusEl.className = `cloud-status ${type}`;
   statusEl.style.display = 'block';
 }
 

@@ -1693,7 +1693,7 @@ input, textarea, select { font-family: var(--font-body); }
   background: var(--indigo-dim);
 }
 
-.supabase-status {
+.cloud-status {
   font-size: 12px;
   padding: 8px 12px;
   border-radius: 8px;
@@ -1701,17 +1701,17 @@ input, textarea, select { font-family: var(--font-body); }
   transition: opacity var(--transition);
 }
 
-.supabase-status.success {
+.cloud-status.success {
   background: var(--emerald-dim);
   color: var(--emerald);
 }
 
-.supabase-status.error {
+.cloud-status.error {
   background: var(--rose-dim);
   color: var(--rose);
 }
 
-.supabase-status.info {
+.cloud-status.info {
   background: var(--indigo-dim);
   color: var(--indigo);
 }

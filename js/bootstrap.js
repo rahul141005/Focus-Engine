@@ -4,16 +4,15 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { state, session, appLocals } from './core/appState.js';
-import { SUPABASE_URL, SUPABASE_KEY } from './config/routes.js';
 import { QUOTES } from './config/constants.js';
 import { todayStr } from './utils/timeUtils.js';
 import { DB } from './services/storageService.js';
-import { Supa } from './services/databaseService.js';
+import { FireDB } from './services/databaseService.js';
 import { toast } from './ui/toastController.js';
 import { openSheet, closeSheet } from './ui/modalController.js';
 import {
   renderHome, renderPlan, renderBacklog, renderSettings,
-  toggleDayCard, toggleSubjectAnalytics, showSupabaseStatus,
+  toggleDayCard, toggleSubjectAnalytics, showCloudStatus,
   renderCSVSelectionList,
 } from './ui/renderEngine.js';
 import { renderProgress } from './features/progressFeature.js';
@@ -73,24 +72,24 @@ function setTheme(theme, btn) {
   DB.save();
 }
 
-async function saveSupabaseConfig() {
-  showSupabaseStatus('Connecting...', 'info');
+async function saveFirebaseConfig() {
+  showCloudStatus('Connecting...', 'info');
 
-  const initResult = await Supa.init(SUPABASE_URL, SUPABASE_KEY);
+  const initResult = await FireDB.init();
 
   if (!initResult.success) {
-    showSupabaseStatus(`Connection failed: ${initResult.error}`, 'error');
+    showCloudStatus(`Connection failed: ${initResult.error}`, 'error');
     return;
   }
 
-  showSupabaseStatus('Connected! Syncing data...', 'info');
+  showCloudStatus('Connected! Syncing data...', 'info');
 
   const [daysResult, tasksResult, sessionsResult, personalResult, analyticsResult] = await Promise.all([
-    Supa.syncDays(),
-    Supa.syncTasks(),
-    Supa.syncSessions(),
-    Supa.syncPersonalTasks(),
-    Supa.syncQuestionAnalytics(),
+    FireDB.syncDays(),
+    FireDB.syncTasks(),
+    FireDB.syncSessions(),
+    FireDB.syncPersonalTasks(),
+    FireDB.syncQuestionAnalytics(),
   ]);
 
   const totalSynced =
@@ -101,9 +100,9 @@ async function saveSupabaseConfig() {
     (analyticsResult.count || 0);
 
   if (totalSynced === 0) {
-    showSupabaseStatus('Already Synced', 'info');
+    showCloudStatus('Already Synced', 'info');
   } else {
-    showSupabaseStatus(`Sync Successful — ${totalSynced} items synced`, 'success');
+    showCloudStatus(`Sync Successful — ${totalSynced} items synced`, 'success');
   }
 
   renderHome();
@@ -143,18 +142,18 @@ function clearData() {
   toast('Data cleared');
 }
 
-// ─── Supabase Auto-Init ────────────────────────────────────────────────
+// ─── Firebase Auto-Init ────────────────────────────────────────────────
 
-async function trySupabaseInit() {
-  const result = await Supa.init(SUPABASE_URL, SUPABASE_KEY);
+async function tryFirebaseInit() {
+  const result = await FireDB.init();
   if (result.success) {
-    showSupabaseStatus('Connected to Supabase', 'success');
+    showCloudStatus('Connected to Firebase', 'success');
     Promise.all([
-      Supa.syncDays(),
-      Supa.syncTasks(),
-      Supa.syncSessions(),
-      Supa.syncPersonalTasks(),
-      Supa.syncQuestionAnalytics(),
+      FireDB.syncDays(),
+      FireDB.syncTasks(),
+      FireDB.syncSessions(),
+      FireDB.syncPersonalTasks(),
+      FireDB.syncQuestionAnalytics(),
     ]).then(() => {
       renderHome();
       renderPlan();
@@ -162,10 +161,10 @@ async function trySupabaseInit() {
       renderProgress();
       renderPersonal();
     }).catch(err => {
-      console.warn('[Supa] sync render failed:', err);
+      console.warn('[Firebase] sync render failed:', err);
     });
   } else {
-    showSupabaseStatus('Supabase offline — data saved locally', 'info');
+    showCloudStatus('Firebase offline — data saved locally', 'info');
   }
 }
 
@@ -358,7 +357,7 @@ export function init() {
     DB.save();
   });
 
-  trySupabaseInit();
+  tryFirebaseInit();
 }
 
 // ─── Public API (for inline onclick handlers in HTML) ──────────────────
@@ -388,7 +387,7 @@ export const AppAPI = {
   undoReschedule,
   toggleSetting,
   setTheme,
-  saveSupabaseConfig,
+  saveFirebaseConfig,
   clearData,
   handleInstall,
   closeSheet,

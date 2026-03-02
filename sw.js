@@ -1,10 +1,39 @@
 /**
  * Focus Engine — Service Worker
  * Strategy: Cache-first for assets, network-first for API calls
- * Implements: Offline caching, Push notifications, Background sync
+ * Implements: Offline caching, Push notifications (FCM), Background sync
  */
 
-const CACHE_VERSION  = 'focus-engine-v3';
+// ─── Firebase Cloud Messaging (background push) ─────────────────────────────
+importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: 'FIREBASE_API_KEY',
+  authDomain: 'FIREBASE_AUTH_DOMAIN',
+  projectId: 'FIREBASE_PROJECT_ID',
+  storageBucket: 'FIREBASE_STORAGE_BUCKET',
+  messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
+  appId: 'FIREBASE_APP_ID',
+});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage(function(payload) {
+  const title = payload.notification?.title || 'Focus Engine';
+  const options = {
+    body: payload.notification?.body || 'Stay on track.',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    vibrate: [100, 50, 100],
+    data: { url: '/', timestamp: Date.now() },
+    requireInteraction: false,
+    silent: false,
+  };
+  return self.registration.showNotification(title, options);
+});
+
+const CACHE_VERSION  = 'focus-engine-v5';
 const STATIC_ASSETS  = [
   '/',
   '/index.html',
@@ -22,6 +51,7 @@ const STATIC_ASSETS  = [
   '/js/core/questionEngine.js',
   '/js/services/storageService.js',
   '/js/services/databaseService.js',
+  '/js/services/firebaseService.js',
   '/js/services/analyticsService.js',
   '/js/ui/renderEngine.js',
   '/js/ui/sessionView.js',
@@ -102,9 +132,9 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET, supabase API calls, chrome-extension
+  // Skip non-GET, Firebase API calls, chrome-extension
   if (request.method !== 'GET') return;
-  if (url.hostname.includes('supabase.co')) return;
+  if (url.hostname.endsWith('.firebaseio.com') || url.hostname.endsWith('.googleapis.com') || url.hostname.endsWith('.gstatic.com')) return;
   if (url.protocol === 'chrome-extension:') return;
 
   // Navigation: network-first with fallback
@@ -198,7 +228,7 @@ self.addEventListener('notificationclick', event => {
   );
 });
 
-// ─── Background sync (for queued Supabase writes when offline) ────────────────
+// ─── Background sync (for queued Firebase writes when offline) ────────────────
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-sessions') {
     event.waitUntil(syncPendingData());
@@ -207,7 +237,7 @@ self.addEventListener('sync', event => {
 
 async function syncPendingData() {
   // In a full implementation, this would read from IndexedDB
-  // and push queued writes to Supabase when connectivity is restored
+  // and push queued writes to Firebase when connectivity is restored
   console.log('[SW] Background sync: syncing pending data');
 }
 

@@ -1,0 +1,99 @@
+// ═══════════════════════════════════════════════════════════════════════
+//  FOCUS ENGINE — Firebase Service (Firestore + Cloud Messaging)
+// ═══════════════════════════════════════════════════════════════════════
+
+import { FIREBASE_CONFIG } from '../config/routes.js';
+
+let _db = null;
+let _messaging = null;
+let _firestore = null; // module reference
+
+export const Firebase = {
+  db: null,
+  messaging: null,
+
+  async init() {
+    try {
+      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js');
+      const firestore = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js');
+      _firestore = firestore;
+
+      const app = initializeApp(FIREBASE_CONFIG);
+      _db = firestore.getFirestore(app);
+      Firebase.db = _db;
+
+      return { success: true };
+    } catch (err) {
+      console.error('[Firebase] init failed:', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  async initMessaging() {
+    try {
+      const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging.js');
+      const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js');
+
+      const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+      _messaging = getMessaging(app);
+      Firebase.messaging = _messaging;
+
+      return { success: true, getToken, onMessage };
+    } catch (err) {
+      console.error('[Firebase] messaging init failed:', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  // ─── Firestore CRUD ──────────────────────────────────────────────────
+
+  async getAll(collectionName) {
+    if (!_db || !_firestore) return { success: false, error: 'Not connected' };
+    try {
+      const { collection, getDocs, query, orderBy } = _firestore;
+      const q = query(collection(_db, collectionName), orderBy('created_at'));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => doc.data());
+      return { success: true, data };
+    } catch (err) {
+      console.error(`[Firebase] getAll ${collectionName}:`, err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  async setDoc(collectionName, id, data) {
+    if (!_db || !_firestore) return { success: false, error: 'Not connected' };
+    try {
+      const { doc, setDoc } = _firestore;
+      await setDoc(doc(_db, collectionName, id), data);
+      return { success: true, data };
+    } catch (err) {
+      console.error(`[Firebase] setDoc ${collectionName}/${id}:`, err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  async updateDoc(collectionName, id, updates) {
+    if (!_db || !_firestore) return { success: false, error: 'Not connected' };
+    try {
+      const { doc, updateDoc } = _firestore;
+      await updateDoc(doc(_db, collectionName, id), updates);
+      return { success: true, data: updates };
+    } catch (err) {
+      console.error(`[Firebase] updateDoc ${collectionName}/${id}:`, err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  async deleteDoc(collectionName, id) {
+    if (!_db || !_firestore) return { success: false, error: 'Not connected' };
+    try {
+      const { doc, deleteDoc } = _firestore;
+      await deleteDoc(doc(_db, collectionName, id));
+      return { success: true };
+    } catch (err) {
+      console.error(`[Firebase] deleteDoc ${collectionName}/${id}:`, err);
+      return { success: false, error: err.message };
+    }
+  },
+};

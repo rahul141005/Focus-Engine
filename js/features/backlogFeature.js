@@ -6,7 +6,7 @@ import { state, appLocals } from '../core/appState.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
 import { esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
 import { toast } from '../ui/toastController.js';
 import { openSheet, closeSheet } from '../ui/modalController.js';
 import { renderBacklog, renderHome, renderPlan } from '../ui/renderEngine.js';
@@ -30,7 +30,7 @@ export function openReassign(taskId) {
   openSheet('sheetReassign');
 }
 
-export function reassignTask(dayId) {
+export async function reassignTask(dayId) {
   const task = state.tasks.find(t => t.id === state.reassignTaskId);
   if (task) {
     const originalDayId = task.day_id;
@@ -43,7 +43,7 @@ export function reassignTask(dayId) {
     });
     task.day_id = dayId;
     DB.save();
-    Supa.updateTask(task.id, { day_id: dayId });
+    await FireDB.updateTask(task.id, { day_id: dayId });
   }
   closeSheet();
   renderBacklog();
@@ -51,13 +51,13 @@ export function reassignTask(dayId) {
   toast('Task moved', 'success');
 }
 
-export function undoReschedule(rescheduleId) {
+export async function undoReschedule(rescheduleId) {
   const entry = state.rescheduledTopics.find(r => r.id === rescheduleId);
   if (!entry) return;
   const task = state.tasks.find(t => t.id === entry.taskId);
   if (task) {
     task.day_id = entry.originalDayId;
-    Supa.updateTask(task.id, { day_id: entry.originalDayId });
+    await FireDB.updateTask(task.id, { day_id: entry.originalDayId });
   }
   state.rescheduledTopics = state.rescheduledTopics.filter(r => r.id !== rescheduleId);
   DB.save();

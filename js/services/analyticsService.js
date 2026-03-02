@@ -1,28 +1,19 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  FOCUS ENGINE — Analytics Service (Push Notifications)
+//  FOCUS ENGINE — Push Service (Firebase Cloud Messaging)
 // ═══════════════════════════════════════════════════════════════════════
 
 import { state } from '../core/appState.js';
-import { VAPID_PUBLIC_KEY } from '../config/routes.js';
+import { FCM_VAPID_KEY } from '../config/routes.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
+import { Firebase } from '../services/firebaseService.js';
 
 // ─── UI callback injected by bootstrap (avoids services→ui dependency) ─
 let _toast = () => {};
+let _foregroundListenerRegistered = false;
 
 export function registerAnalyticsUI(toastFn) {
   _toast = toastFn;
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
 }
 
 export async function requestNotificationPermission() {
@@ -45,36 +36,57 @@ export async function subscribeToPushNotifications() {
       return { success: false, error: 'Permission denied' };
     }
 
-    const registration = await navigator.serviceWorker.ready;
-
-    let subscription = await registration.pushManager.getSubscription();
-
-    if (!subscription) {
-      const vapidPublicKey = VAPID_PUBLIC_KEY;
-
-      if (!vapidPublicKey) {
-        console.warn('VAPID key not configured');
-        return { success: false, error: 'VAPID key not configured' };
-      }
-
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      });
+    const msgResult = await Firebase.initMessaging();
+    if (!msgResult.success) {
+      console.warn('[FCM] messaging init failed:', msgResult.error);
+      return { success: false, error: msgResult.error };
     }
 
-    const result = await Supa.savePushSubscription(subscription);
+    const { getToken, onMessage } = msgResult;
+    const registration = await navigator.serviceWorker.ready;
+
+    const token = await getToken(Firebase.messaging, {
+      vapidKey: FCM_VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+
+    if (!token) {
+      console.warn('[FCM] No token received');
+      return { success: false, error: 'No FCM token received' };
+    }
+
+    // Handle foreground messages (background handled by SW)
+    if (!_foregroundListenerRegistered) {
+      try {
+        onMessage(Firebase.messaging, (payload) => {
+          const title = payload.notification?.title || 'Focus Engine';
+          const body = payload.notification?.body || 'Stay on track.';
+          if (Notification.permission === 'granted') {
+            new Notification(title, {
+              body,
+              icon: '/icons/icon-192.png',
+              badge: '/icons/icon-192.png',
+            });
+          }
+        });
+        _foregroundListenerRegistered = true;
+      } catch (listenerErr) {
+        console.warn('[FCM] foreground listener registration failed:', listenerErr);
+      }
+    }
+
+    const result = await FireDB.savePushToken(token);
 
     if (result.success) {
-      state.pushSubscription = subscription.toJSON();
+      state.pushSubscription = { token };
       DB.save();
-      return { success: true, subscription };
+      return { success: true, token };
     }
 
     return result;
 
   } catch (err) {
-    console.error('Push subscription error:', err);
+    console.error('[FCM] Push subscription error:', err);
     return { success: false, error: err.message };
   }
 }

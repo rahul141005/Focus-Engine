@@ -8,7 +8,7 @@ import { SUBJECT_COLORS, MIN_SESSION_SECONDS } from '../config/constants.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
 import { fmtTime, fmtMins, esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
-import { Supa } from '../services/databaseService.js';
+import { FireDB } from '../services/databaseService.js';
 import { startSessionTimer, stopSessionTimer } from './timerEngine.js';
 
 // ─── UI callbacks injected by bootstrap (avoids core→ui dependency) ────
@@ -204,7 +204,7 @@ export function switchSessionMode() {
   _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
 }
 
-export function endSession() {
+export async function endSession() {
   if (!session.active) return;
   session.active = false;
   stopSessionTimer();
@@ -260,13 +260,14 @@ export function endSession() {
     const sesMins = Math.floor(finalElapsed / 60);
     if (sesMins >= (task.estimated_minutes || 0) * 0.8) {
       task.status = 'completed';
-      Supa.updateTask(task.id, { status: 'completed' });
+      await FireDB.updateTask(task.id, { status: 'completed' });
     }
   }
 
+  let qaRecord = null;
   if (session.mode === 'perQuestion' && session.questions.length > 0) {
     const validQuestions = session.questions.filter(q => q !== undefined);
-    const qaRecord = {
+    qaRecord = {
       id: uid(),
       sessionId: record.id,
       subject: session.subject,
@@ -279,7 +280,10 @@ export function endSession() {
   }
 
   DB.save();
-  Supa.insertSession(record);
+  await FireDB.insertSession(record);
+  if (qaRecord) {
+    await FireDB.insertQuestionAnalytics(qaRecord);
+  }
 
   const summaryQuestions = session.questions.filter(q => q !== undefined);
   const summaryMode = session.mode;

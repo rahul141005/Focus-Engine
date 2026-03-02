@@ -24,7 +24,6 @@ export const state = {
     },
     sound: true,
     theme: 'focus',
-    supabase: null,
   },
   currentDayId: null,
   reassignTaskId: null,
