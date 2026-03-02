@@ -8,13 +8,13 @@ importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: 'FIREBASE_API_KEY',
-  authDomain: 'FIREBASE_AUTH_DOMAIN',
-  projectId: 'FIREBASE_PROJECT_ID',
-  storageBucket: 'FIREBASE_STORAGE_BUCKET',
-  messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
-  appId: 'FIREBASE_APP_ID',
-});
+  apiKey: "AIzaSyCCI3GicwvOpKFkeA2dOPYTkernd1CB2HU",
+  authDomain: "focus-engine-4344e.firebaseapp.com",
+  projectId: "focus-engine-4344e",
+  storageBucket: "focus-engine-4344e.firebasestorage.app",
+  messagingSenderId: "568481515878",
+  appId: "1:568481515878:web:109384065f3e7cf8ac60a7"
+};
 
 const messaging = firebase.messaging();
 
