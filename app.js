@@ -941,7 +941,7 @@ const App = (() => {
 
     // Render rescheduled topics section
     const rescheduledEl = document.getElementById('rescheduledList');
-    const rescheduledHeader = rescheduledEl ? rescheduledEl.previousElementSibling : null;
+    const rescheduledHeader = document.getElementById('rescheduledHeader');
     if (rescheduledEl) {
       const rescheduled = state.rescheduledTopics.filter(r => {
         const task = state.tasks.find(t => t.id === r.taskId);
@@ -1777,6 +1777,8 @@ const App = (() => {
       }
     }
 
+    // Defensive guard: browser tab suspension or rapid pause/resume edge cases
+    // could theoretically cause startTime drift — clamp to prevent negative display
     const finalElapsed = Math.max(0, Math.floor((Date.now() - session.startTime) / 1000));
     document.getElementById('sessionOverlay').classList.remove('active');
     document.getElementById('perQuestionPanel').style.display = 'none';
