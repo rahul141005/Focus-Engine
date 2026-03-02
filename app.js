@@ -118,6 +118,7 @@ const App = (() => {
     personalTasks: [],
     questionAnalytics: [],
     sessionNotes: [],
+    questionNotes: [],
     rescheduledTopics: [],
     settings: {
       dayEndTime: '23:00',
@@ -154,6 +155,7 @@ const App = (() => {
     timerRef: null,
     mode: 'full',
     questions: [],
+    questionIndex: 0,
     currentQuestionStart: null,
     questionElapsed: 0,
   };
@@ -175,6 +177,7 @@ const App = (() => {
         personalTasks: state.personalTasks,
         questionAnalytics: state.questionAnalytics,
         sessionNotes: state.sessionNotes,
+        questionNotes: state.questionNotes,
         rescheduledTopics: state.rescheduledTopics,
         settings: state.settings,
         pushSubscription: state.pushSubscription,
@@ -189,6 +192,7 @@ const App = (() => {
         if (saved.personalTasks) state.personalTasks = saved.personalTasks;
         if (saved.questionAnalytics) state.questionAnalytics = saved.questionAnalytics;
         if (saved.sessionNotes) state.sessionNotes = saved.sessionNotes;
+        if (saved.questionNotes) state.questionNotes = saved.questionNotes;
         if (saved.rescheduledTopics) state.rescheduledTopics = saved.rescheduledTopics;
         if (saved.settings) state.settings = Object.assign(state.settings, saved.settings);
         if (saved.pushSubscription) state.pushSubscription = saved.pushSubscription;
@@ -1641,6 +1645,7 @@ const App = (() => {
     session.elapsed   = 0;
     session.mode      = mode;
     session.questions = [];
+    session.questionIndex = 0;
     session.currentQuestionStart = Date.now();
     session.questionElapsed = 0;
 
@@ -1711,24 +1716,17 @@ const App = (() => {
     const wasPaused = session.paused;
     if (!wasPaused) pauseSession();
 
-    // Use pausedAt as the reference point — Date.now() includes pause duration
-    const refTime = session.pausedAt || Date.now();
-
-    if (session.mode === 'perQuestion' && session.currentQuestionStart) {
-      const qTime = Math.floor((refTime - session.currentQuestionStart) / 1000);
-      if (qTime > 0) session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: false });
-    }
-
     session.mode = session.mode === 'full' ? 'perQuestion' : 'full';
     const pqPanel = document.getElementById('perQuestionPanel');
     const modeBtn = document.getElementById('btnSwitchMode');
+
     if (session.mode === 'perQuestion') {
       pqPanel.style.display = '';
-      // Set to pausedAt so resume adjustment (+=pausedDuration) yields correct resumeTime
-      session.currentQuestionStart = refTime;
-      session.questionElapsed = 0;
-      document.getElementById('questionNumber').textContent = session.questions.length + 1;
-      document.getElementById('questionTimer').textContent = '00:00';
+      if (!session.currentQuestionStart) {
+        session.currentQuestionStart = session.pausedAt || Date.now();
+      }
+      document.getElementById('questionNumber').textContent = session.questionIndex + 1;
+      document.getElementById('questionTimer').textContent = fmtTime(session.questionElapsed);
     } else {
       pqPanel.style.display = 'none';
     }
@@ -1740,17 +1738,22 @@ const App = (() => {
 
   function prevQuestion() {
     if (!session.active || session.paused || session.mode !== 'perQuestion') return;
-    if (session.questions.length === 0) return;
-    // Save current question time before going back
+    if (session.questionIndex <= 0) return;
+
+    // Save current question time at current index before going back
     const curQTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
-    if (curQTime > 0) {
-      session.questions.push({ number: session.questions.length + 1, seconds: curQTime, skipped: false });
-    }
-    // Go back to re-do previous question (recorded time is preserved in the array)
-    session.currentQuestionStart = Date.now();
-    session.questionElapsed = 0;
-    document.getElementById('questionNumber').textContent = session.questions.length + 1;
-    document.getElementById('questionTimer').textContent = '00:00';
+    session.questions[session.questionIndex] = { number: session.questionIndex + 1, seconds: curQTime, skipped: false };
+
+    // Decrement question index
+    session.questionIndex--;
+
+    // Restore previous question's recorded time
+    const prevQ = session.questions[session.questionIndex];
+    session.questionElapsed = prevQ.seconds;
+    session.currentQuestionStart = Date.now() - (prevQ.seconds * 1000);
+
+    document.getElementById('questionNumber').textContent = session.questionIndex + 1;
+    document.getElementById('questionTimer').textContent = fmtTime(prevQ.seconds);
   }
 
   function endSession() {
@@ -1773,7 +1776,7 @@ const App = (() => {
     if (session.mode === 'perQuestion' && session.currentQuestionStart) {
       const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
       if (qTime > 0) {
-        session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: false });
+        session.questions[session.questionIndex] = { number: session.questionIndex + 1, seconds: qTime, skipped: false };
       }
     }
 
@@ -1791,6 +1794,10 @@ const App = (() => {
 
     if (finalElapsed < MIN_SESSION_SECONDS) {
       session.active = false;
+      session.questions = [];
+      session.questionIndex = 0;
+      session.questionElapsed = 0;
+      session.mode = 'full';
       toast('Session too short (< 2 min) — not saved', 'warning');
       return;
     }
@@ -1817,13 +1824,14 @@ const App = (() => {
 
     // Store per-question analytics
     if (session.mode === 'perQuestion' && session.questions.length > 0) {
+      const validQuestions = session.questions.filter(q => q !== undefined);
       const qaRecord = {
         id: uid(),
         sessionId: record.id,
         subject: session.subject,
         topic: session.topic,
         date: todayStr(),
-        questions: session.questions,
+        questions: validQuestions,
         created_at: new Date().toISOString(),
       };
       state.questionAnalytics.push(qaRecord);
@@ -1833,7 +1841,7 @@ const App = (() => {
     Supa.insertSession(record);
 
     // Capture data needed for summary before resetting session
-    const summaryQuestions = [...session.questions];
+    const summaryQuestions = session.questions.filter(q => q !== undefined);
     const summaryMode = session.mode;
 
     // Fully reset session state
@@ -1842,6 +1850,10 @@ const App = (() => {
     session.taskId = null;
     session.pausedAt = null;
     session.currentQuestionStart = null;
+    session.questions = [];
+    session.questionIndex = 0;
+    session.questionElapsed = 0;
+    session.mode = 'full';
 
     renderHome();
     renderProgress();
@@ -1933,20 +1945,22 @@ const App = (() => {
   function nextQuestion() {
     if (!session.active || session.paused || session.mode !== 'perQuestion') return;
     const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
-    session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: false });
+    session.questions[session.questionIndex] = { number: session.questionIndex + 1, seconds: qTime, skipped: false };
+    session.questionIndex++;
     session.currentQuestionStart = Date.now();
     session.questionElapsed = 0;
-    document.getElementById('questionNumber').textContent = session.questions.length + 1;
+    document.getElementById('questionNumber').textContent = session.questionIndex + 1;
     document.getElementById('questionTimer').textContent = '00:00';
   }
 
   function skipQuestion() {
     if (!session.active || session.paused || session.mode !== 'perQuestion') return;
     const qTime = Math.floor((Date.now() - session.currentQuestionStart) / 1000);
-    session.questions.push({ number: session.questions.length + 1, seconds: qTime, skipped: true });
+    session.questions[session.questionIndex] = { number: session.questionIndex + 1, seconds: qTime, skipped: true };
+    session.questionIndex++;
     session.currentQuestionStart = Date.now();
     session.questionElapsed = 0;
-    document.getElementById('questionNumber').textContent = session.questions.length + 1;
+    document.getElementById('questionNumber').textContent = session.questionIndex + 1;
     document.getElementById('questionTimer').textContent = '00:00';
   }
 
@@ -2453,6 +2467,7 @@ const App = (() => {
     state.personalTasks = [];
     state.questionAnalytics = [];
     state.sessionNotes = [];
+    state.questionNotes = [];
     state.rescheduledTopics = [];
     DB.save();
     renderHome(); 
