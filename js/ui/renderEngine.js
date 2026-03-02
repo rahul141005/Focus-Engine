@@ -53,7 +53,11 @@ export function renderHome() {
 
   list.innerHTML = Object.entries(subjectMap).map(([subj, data]) => {
     const color = SUBJECT_COLORS[subj] || SUBJECT_COLORS.Other;
-    const topics = data.tasks.map(t => esc(t.topic)).join(', ');
+    const topics = data.tasks.map(t => {
+      let label = esc(t.topic);
+      if (t.sub_topic) label += ` <span class="subject-sub-topic">· ${esc(t.sub_topic)}</span>`;
+      return label;
+    }).join(', ');
     const remaining = data.total - data.done;
     const pct = data.total > 0 ? (data.done / data.total) * 100 : 0;
     const allDone = remaining <= 0;
@@ -92,6 +96,7 @@ export function renderTaskRow(task) {
     <div class="task-info">
       <div class="task-subject" style="color:${color}">${task.subject}</div>
       <div class="task-topic" contenteditable="false" data-field="topic">${esc(task.topic)}</div>
+      ${task.sub_topic ? `<div class="task-sub-topic">${esc(task.sub_topic)}</div>` : ''}
     </div>
     <div class="task-time" contenteditable="false" data-field="minutes">${fmtMins(task.estimated_minutes || 0)}</div>
     <div class="task-actions">
@@ -139,7 +144,8 @@ export function renderPlan() {
     const tasks = state.tasks.filter(t => t.day_id === day.id);
     return tasks.some(t =>
       (t.subject && t.subject.toLowerCase().includes(query)) ||
-      (t.topic && t.topic.toLowerCase().includes(query))
+      (t.topic && t.topic.toLowerCase().includes(query)) ||
+      (t.sub_topic && t.sub_topic.toLowerCase().includes(query))
     );
   }) : state.days;
 
@@ -238,9 +244,10 @@ export function renderBacklog() {
         <div class="pending-info">
           <div class="pending-subject" style="color:${color}">${t.subject}</div>
           <div class="pending-topic">${esc(t.topic)}</div>
+          ${t.sub_topic ? `<div class="pending-sub-topic">${esc(t.sub_topic)}</div>` : ''}
           <div class="pending-origin">From ${day ? esc(day.label) : 'Unknown'}</div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="pending-actions">
           <div class="pending-time">${fmtMins(t.estimated_minutes || 0)}</div>
           <button class="btn-reassign" onclick="App.openReassign('${t.id}')">Move</button>
         </div>
@@ -369,7 +376,7 @@ export function renderCSVSelectionList(dayGroups) {
             </div>
             <div class="csv-task-info">
               <div class="csv-task-subj" style="color:${color}">${esc(row.subject.trim())}</div>
-              <div class="csv-task-topic">${esc(row.topic.trim())}${subTopic ? ` <span style="color:var(--text-3);font-size:12px">· ${esc(subTopic)}</span>` : ''}</div>
+              <div class="csv-task-topic">${esc(row.topic.trim())}${subTopic ? ` <span class="csv-task-subtopic">· ${esc(subTopic)}</span>` : ''}</div>
             </div>
             <div class="csv-task-mins">${parseInt(row.estimated_minutes) || 0}m</div>
           </div>`;

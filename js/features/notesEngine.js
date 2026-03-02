@@ -32,7 +32,7 @@ export function openEditNote(id) {
   if (input) input.value = note.text;
   if (subjectEl) subjectEl.value = note.subject || '';
   if (topicEl) topicEl.value = note.topic || '';
-  if (subTopicEl) subTopicEl.value = note.sub_topic || note.subNote || '';
+  if (subTopicEl) subTopicEl.value = note.sub_topic || '';
   if (hiddenId) hiddenId.value = note.id;
 
   document.getElementById('sheetBackdrop').classList.add('active');
@@ -52,7 +52,10 @@ export function closeNoteModal() {
   document.getElementById('sheetBackdrop').classList.remove('active');
 }
 
+let _savingEditNote = false;
+
 export async function saveEditNote() {
+  if (_savingEditNote) return;
   const id = document.getElementById('editNoteId').value;
   const text = document.getElementById('editNoteText').value.trim();
   const topic = document.getElementById('editNoteTopic').value.trim();
@@ -65,12 +68,20 @@ export async function saveEditNote() {
   const note = state.sessionNotes.find(n => n.id === id);
   if (!note) return;
 
+  _savingEditNote = true;
+
   note.text = text;
   note.topic = topic;
   // sub_topic is NOT editable — preserved from session
 
   DB.save();
-  await Firebase.updateDoc('sessionNotes', id, { text: note.text, topic: note.topic, sub_topic: note.sub_topic || null, subject: note.subject });
+  try {
+    await Firebase.updateDoc('sessionNotes', id, { text: note.text, topic: note.topic, sub_topic: note.sub_topic || null, subject: note.subject });
+  } catch (err) {
+    console.error('[FE] Note update failed:', err);
+  } finally {
+    _savingEditNote = false;
+  }
 
   closeNoteModal();
   renderPersonal();

@@ -21,6 +21,8 @@ export function openAddTask(dayId) {
   document.querySelectorAll('.subj-chip').forEach(c => c.classList.remove('active'));
   document.getElementById('inputTaskTopic').value = '';
   document.getElementById('inputTaskMins').value  = '';
+  const subTopicInput = document.getElementById('inputTaskSubTopic');
+  if (subTopicInput) subTopicInput.value = '';
   openSheet('sheetAddTask');
 }
 
@@ -38,6 +40,8 @@ export async function saveTask() {
   const subj  = state.selectedSubject;
   const topic = document.getElementById('inputTaskTopic').value.trim();
   const mins  = parseInt(document.getElementById('inputTaskMins').value) || 0;
+  const subTopicInput = document.getElementById('inputTaskSubTopic');
+  const subTopic = subTopicInput ? subTopicInput.value.trim() || null : null;
 
   if (!subj)  { toast('Pick a subject', 'error'); return; }
   if (!topic) { toast('Enter a topic', 'error');  return; }
@@ -46,13 +50,17 @@ export async function saveTask() {
 
   const task = {
     id: uid(), day_id: state.currentDayId,
-    subject: subj, topic, sub_topic: null, estimated_minutes: mins,
+    subject: subj, topic, sub_topic: subTopic, estimated_minutes: mins,
     status: 'pending', created_at: new Date().toISOString()
   };
 
   state.tasks.push(task);
   DB.save();
-  await FireDB.insertTask(task);
+  try {
+    await FireDB.insertTask(task);
+  } catch (err) {
+    console.error('[FE] Task insert to Firebase failed:', err);
+  }
   _savingTask = false;
   closeSheet();
   renderPlan();
@@ -159,7 +167,11 @@ export async function saveDay() {
   const day = { id: uid(), label, date: date || null, created_at: new Date().toISOString() };
   state.days.push(day);
   DB.save();
-  await FireDB.insertDay(day);
+  try {
+    await FireDB.insertDay(day);
+  } catch (err) {
+    console.error('[FE] Day insert to Firebase failed:', err);
+  }
   _savingDay = false;
   closeSheet();
   renderPlan();
@@ -367,7 +379,7 @@ export async function handleCSVImport(file) {
     showCSVSelectionUI(dayGroups);
 
   } catch (err) {
-    console.error('CSV import error:', err);
+    console.error('[CSV] Import error:', err);
     proc.classList.remove('active');
     toast('Import failed — check file format', 'error');
   }

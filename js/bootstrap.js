@@ -359,8 +359,6 @@ export function init() {
   if (btnSkip) btnSkip.addEventListener('click', skipQuestion);
   const btnPrev = document.getElementById('btnPrevQuestion');
   if (btnPrev) btnPrev.addEventListener('click', prevQuestion);
-  const btnSwitch = document.getElementById('btnSwitchMode');
-  if (btnSwitch) btnSwitch.addEventListener('click', switchSessionMode);
 
   const planSearch = document.getElementById('planSearchInput');
   if (planSearch) planSearch.addEventListener('input', e => handlePlanSearch(e.target.value));

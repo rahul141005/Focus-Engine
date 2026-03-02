@@ -6,6 +6,8 @@
 import { state, session } from '../core/appState.js';
 import { SUBJECT_COLORS, MIN_SESSION_SECONDS } from '../config/constants.js';
 import { uid, todayStr } from '../utils/timeUtils.js';
+
+const MODE_SWITCH_COOLDOWN_MS = 300;
 import { fmtTime, fmtMins, esc } from '../utils/formatUtils.js';
 import { DB } from '../services/storageService.js';
 import { FireDB } from '../services/databaseService.js';
@@ -24,6 +26,15 @@ const _ui = {
 
 export function registerSessionUI(callbacks) {
   Object.assign(_ui, callbacks);
+}
+
+function updateModeSegmentedControl(mode) {
+  const segFull = document.getElementById('segModeFull');
+  const segTimed = document.getElementById('segModeTimed');
+  if (segFull && segTimed) {
+    segFull.classList.toggle('active', mode === 'full');
+    segTimed.classList.toggle('active', mode === 'perQuestion');
+  }
 }
 
 function playEndTone() {
@@ -85,13 +96,14 @@ export function startSessionFlow() {
       <div class="pick-info">
         <div class="pick-subj" style="color:${color}">${t.subject}</div>
         <div class="pick-topic">${esc(t.topic)}</div>
+        ${t.sub_topic ? `<div class="pick-sub-topic">${esc(t.sub_topic)}</div>` : ''}
         <div class="pick-meta">
           <span>Est: ${fmtMins(estMins)}</span>
           ${completedMins > 0 ? `<span>Done: ${fmtMins(completedMins)}</span>` : ''}
           ${remainMins > 0 && completedMins > 0 ? `<span>Left: ${fmtMins(remainMins)}</span>` : ''}
         </div>
         ${lastInfo ? `<div class="pick-last">${lastInfo}</div>` : ''}
-        ${day && day.date !== today ? `<div style="font-size:11px;color:var(--text-3)">From ${esc(day.label)}</div>` : ''}
+        ${day && day.date !== today ? `<div class="pick-last">From ${esc(day.label)}</div>` : ''}
       </div>
       <div class="pick-time">${fmtMins(estMins)}</div>
     </div>`;
@@ -143,8 +155,7 @@ export function startSessionWithMode(mode) {
   document.getElementById('btnPauseSession').textContent = 'Pause';
   document.getElementById('sessionOverlay').classList.add('active');
 
-  const modeBtn = document.getElementById('btnSwitchMode');
-  if (modeBtn) modeBtn.textContent = mode === 'full' ? 'Timed Q' : 'Full';
+  updateModeSegmentedControl(mode);
 
   const pqPanel = document.getElementById('perQuestionPanel');
   if (mode === 'perQuestion') {
@@ -184,11 +195,13 @@ export function pauseSession() {
   }
 }
 
+let _switchingMode = false;
+
 export function switchSessionMode() {
-  if (!session.active) return;
+  if (!session.active || _switchingMode) return;
+  _switchingMode = true;
 
   const pqPanel = document.getElementById('perQuestionPanel');
-  const modeBtn = document.getElementById('btnSwitchMode');
 
   if (session.mode === 'perQuestion') {
     if (!session.paused && session.currentQuestionStart) {
@@ -208,18 +221,33 @@ export function switchSessionMode() {
     document.getElementById('questionTimer').textContent = fmtTime(session.questionElapsed);
   }
 
-  if (modeBtn) modeBtn.textContent = session.mode === 'full' ? 'Timed Q' : 'Full';
+  updateModeSegmentedControl(session.mode);
   _ui.toast(`Switched to ${session.mode === 'full' ? 'Full' : 'Timed Q'} mode`);
+  // Prevent rapid switching — re-enable after short delay
+  setTimeout(() => { _switchingMode = false; }, MODE_SWITCH_COOLDOWN_MS);
+}
+
+let _endingSession = false;
+
+function _resetEndSessionButtons() {
+  const endBtn = document.getElementById('btnEndSession');
+  const pauseBtn = document.getElementById('btnPauseSession');
+  if (endBtn) endBtn.disabled = false;
+  if (pauseBtn) pauseBtn.disabled = false;
+  _endingSession = false;
 }
 
 export async function endSession() {
-  if (!session.active) return;
+  if (!session.active || _endingSession) return;
+  _endingSession = true;
   session.active = false;
   stopSessionTimer();
 
-  // Disable end session button to prevent double submission
+  // Disable session buttons to prevent double submission
   const endBtn = document.getElementById('btnEndSession');
+  const pauseBtn = document.getElementById('btnPauseSession');
   if (endBtn) endBtn.disabled = true;
+  if (pauseBtn) pauseBtn.disabled = true;
 
   if (session.paused) {
     const pausedDuration = Date.now() - session.pausedAt;
@@ -258,7 +286,7 @@ export async function endSession() {
     session.topic = '';
     session.pausedAt = null;
     session.currentQuestionStart = null;
-    if (endBtn) endBtn.disabled = false;
+    _resetEndSessionButtons();
     _ui.toast('Session too short (< 2 min) — not saved', 'warning');
     return;
   }
@@ -281,7 +309,6 @@ export async function endSession() {
     const sesMins = Math.floor(finalElapsed / 60);
     if (sesMins >= (task.estimated_minutes || 0) * 0.8) {
       task.status = 'completed';
-      await FireDB.updateTask(task.id, { status: 'completed' });
     }
   }
 
@@ -302,9 +329,19 @@ export async function endSession() {
   }
 
   DB.save();
-  await FireDB.insertSession(record);
-  if (qaRecord) {
-    await FireDB.insertQuestionAnalytics(qaRecord);
+
+  // Firestore writes — non-blocking, errors logged but don't break session end
+  try {
+    const firebasePromises = [FireDB.insertSession(record)];
+    if (task && task.status === 'completed') {
+      firebasePromises.push(FireDB.updateTask(task.id, { status: 'completed' }));
+    }
+    if (qaRecord) {
+      firebasePromises.push(FireDB.insertQuestionAnalytics(qaRecord));
+    }
+    await Promise.all(firebasePromises);
+  } catch (err) {
+    console.error('[FE] endSession Firebase write failed:', err);
   }
 
   const summaryQuestions = session.questions.filter(q => q !== undefined);
@@ -329,6 +366,5 @@ export async function endSession() {
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
   if (state.settings.sound) playEndTone();
 
-  // Re-enable end session button
-  if (endBtn) endBtn.disabled = false;
+  _resetEndSessionButtons();
 }

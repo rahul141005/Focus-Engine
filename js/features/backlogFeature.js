@@ -23,10 +23,10 @@ export function openReassign(taskId) {
     return `<div class="session-pick-item" onclick="App.reassignTask('${day.id}')">
       <div class="pick-info">
         <div class="pick-subj">${esc(day.label)}</div>
-        <div style="font-size:12px;color:var(--text-3)">${day.date || 'No date'}</div>
+        <div class="pick-last">${day.date || 'No date'}</div>
       </div>
     </div>`;
-  }).join('') || '<div style="padding:16px;color:var(--text-3);font-size:13px">No days available</div>';
+  }).join('') || '<div class="backlog-empty-msg">No days available</div>';
   openSheet('sheetReassign');
 }
 
