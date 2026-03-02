@@ -1749,6 +1749,7 @@ const App = (() => {
 
     // Restore previous question's recorded time
     const prevQ = session.questions[session.questionIndex];
+    if (!prevQ) return;
     session.questionElapsed = prevQ.seconds;
     session.currentQuestionStart = Date.now() - (prevQ.seconds * 1000);
 
