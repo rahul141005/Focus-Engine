@@ -362,7 +362,7 @@ export function renderCSVSelectionList(dayGroups) {
         ${tasks.map((row, idx) => {
           const color = SUBJECT_COLORS[row.subject.trim()] || SUBJECT_COLORS.Other;
           const taskChecked = sel.tasks[idx];
-          const subNote = row.subnote ? row.subnote.trim() : '';
+          const subNote = (row.subnote || row.sub_note || '').trim();
           return `<div class="csv-task-item" data-task-idx="${dayIdx}-${idx}">
             <div class="csv-task-check ${taskChecked ? 'checked' : ''}" data-task-check="${dayIdx}-${idx}" onclick="App.toggleCSVTask(${dayIdx},${idx})">
               ${taskChecked ? checkSvg10 : ''}
