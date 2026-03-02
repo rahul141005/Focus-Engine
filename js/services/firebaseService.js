@@ -14,6 +14,11 @@ export const Firebase = {
 
   async init() {
     try {
+      console.log('[BOOT] Firebase init start');
+      if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId) {
+        console.error('[Firebase] FIREBASE_CONFIG is missing or invalid');
+        return { success: false, error: 'Firebase config is missing or invalid' };
+      }
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js');
       const firestore = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js');
       _firestore = firestore;
@@ -22,6 +27,7 @@ export const Firebase = {
       _db = firestore.getFirestore(app);
       Firebase.db = _db;
 
+      console.log('[BOOT] Firebase init complete');
       return { success: true };
     } catch (err) {
       console.error('[Firebase] init failed:', err);
@@ -50,10 +56,12 @@ export const Firebase = {
   async getAll(collectionName) {
     if (!_db || !_firestore) return { success: false, error: 'Not connected' };
     try {
+      console.log(`[BOOT] Firestore reading collection: ${collectionName}`);
       const { collection, getDocs, query, orderBy } = _firestore;
       const q = query(collection(_db, collectionName), orderBy('created_at'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => doc.data());
+      console.log(`[BOOT] Firestore ${collectionName}: ${data.length} docs`);
       return { success: true, data };
     } catch (err) {
       console.error(`[Firebase] getAll ${collectionName}:`, err);

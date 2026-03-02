@@ -145,9 +145,11 @@ function clearData() {
 // ─── Firebase Auto-Init ────────────────────────────────────────────────
 
 async function tryFirebaseInit() {
+  console.log('[BOOT] Firebase auto-init starting');
   const result = await FireDB.init();
   if (result.success) {
     showCloudStatus('Connected to Firebase', 'success');
+    console.log('[BOOT] Firestore connected — starting data sync');
     Promise.all([
       FireDB.syncDays(),
       FireDB.syncTasks(),
@@ -155,15 +157,18 @@ async function tryFirebaseInit() {
       FireDB.syncPersonalTasks(),
       FireDB.syncQuestionAnalytics(),
     ]).then(() => {
+      console.log('[BOOT] Data fetch complete — re-rendering');
       renderHome();
       renderPlan();
       renderBacklog();
       renderProgress();
       renderPersonal();
     }).catch(err => {
-      console.warn('[Firebase] sync render failed:', err);
+      console.error('[Firebase] sync failed:', err);
+      showCloudStatus('Database sync error — using local data', 'error');
     });
   } else {
+    console.warn('[BOOT] Firebase offline:', result.error);
     showCloudStatus('Firebase offline — data saved locally', 'info');
   }
 }
@@ -178,6 +183,7 @@ export function init() {
     return;
   }
   _initialized = true;
+  console.log('[BOOT] init start');
 
   // Wire up UI callbacks for core/services layer (avoids layer violations)
   registerSessionUI({
@@ -192,6 +198,7 @@ export function init() {
   registerAnalyticsUI(toast);
 
   DB.load();
+  console.log('[BOOT] Local data loaded');
 
   if (state.settings.theme) {
     document.documentElement.dataset.theme = state.settings.theme;
@@ -199,8 +206,10 @@ export function init() {
 
   startClock();
   loadRandomQuote();
+  console.log('[BOOT] Render start');
   renderHome();
   renderProgress();
+  console.log('[BOOT] Render complete');
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js')

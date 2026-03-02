@@ -14,7 +14,7 @@ firebase.initializeApp({
   storageBucket: "focus-engine-4344e.firebasestorage.app",
   messagingSenderId: "568481515878",
   appId: "1:568481515878:web:109384065f3e7cf8ac60a7"
-};
+});
 
 const messaging = firebase.messaging();
 

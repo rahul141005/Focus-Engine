@@ -2,7 +2,7 @@
 //  FOCUS ENGINE — Routes & API Configuration
 // ═══════════════════════════════════════════════════════════════════════
 
-const firebaseConfig = {
+export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCCI3GicwvOpKFkeA2dOPYTkernd1CB2HU",
   authDomain: "focus-engine-4344e.firebaseapp.com",
   projectId: "focus-engine-4344e",
