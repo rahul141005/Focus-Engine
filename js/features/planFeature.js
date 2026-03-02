@@ -1,0 +1,451 @@
+// ═══════════════════════════════════════════════════════════════════════
+//  FOCUS ENGINE — Plan Feature (Day/Task Management, CSV Import)
+// ═══════════════════════════════════════════════════════════════════════
+
+import { state, appLocals } from '../core/appState.js';
+import { SUBJECT_COLORS, SEARCH_DEBOUNCE_MS } from '../config/constants.js';
+import { uid, todayStr } from '../utils/timeUtils.js';
+import { fmtMins, esc } from '../utils/formatUtils.js';
+import { debounce } from '../utils/debounce.js';
+import { DB } from '../services/storageService.js';
+import { Supa } from '../services/databaseService.js';
+import { toast } from '../ui/toastController.js';
+import { openSheet, closeSheet } from '../ui/modalController.js';
+import { renderPlan, renderHome, renderBacklog, renderCSVSelectionList } from '../ui/renderEngine.js';
+
+// ─── Task Management ───────────────────────────────────────────────────
+
+export function openAddTask(dayId) {
+  state.currentDayId = dayId;
+  state.selectedSubject = null;
+  document.querySelectorAll('.subj-chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('inputTaskTopic').value = '';
+  document.getElementById('inputTaskMins').value  = '';
+  openSheet('sheetAddTask');
+}
+
+export function selectSubject(btn) {
+  document.querySelectorAll('.subj-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  state.selectedSubject = btn.dataset.subj;
+}
+
+export function saveTask() {
+  if (!state.currentDayId) { toast('No day selected','error'); return; }
+  const subj  = state.selectedSubject;
+  const topic = document.getElementById('inputTaskTopic').value.trim();
+  const mins  = parseInt(document.getElementById('inputTaskMins').value) || 0;
+
+  if (!subj)  { toast('Pick a subject', 'error'); return; }
+  if (!topic) { toast('Enter a topic', 'error');  return; }
+
+  const task = {
+    id: uid(), day_id: state.currentDayId,
+    subject: subj, topic, estimated_minutes: mins,
+    status: 'pending', created_at: new Date().toISOString()
+  };
+
+  state.tasks.push(task);
+  DB.save();
+  Supa.insertTask(task);
+  closeSheet();
+  renderPlan();
+  renderHome();
+  toast('Task added', 'success');
+}
+
+export function toggleTask(taskId) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  task.status = task.status === 'completed' ? 'pending' : 'completed';
+  if (task.status === 'completed' && navigator.vibrate) navigator.vibrate(30);
+  DB.save();
+  Supa.updateTask(taskId, { status: task.status });
+  renderPlan();
+  renderHome();
+  renderBacklog();
+}
+
+export function deleteTask(taskId) {
+  if (!confirm('Delete this task?')) return;
+
+  state.tasks = state.tasks.filter(t => t.id !== taskId);
+  DB.save();
+  Supa.deleteTask(taskId);
+  renderPlan();
+  renderHome();
+  renderBacklog();
+  toast('Task removed');
+}
+
+export function toggleEditTask(taskId) {
+  const taskItem = document.querySelector(`[data-task-id="${taskId}"]`);
+  if (!taskItem) return;
+
+  const topicEl = taskItem.querySelector('[data-field="topic"]');
+  const minsEl  = taskItem.querySelector('[data-field="minutes"]');
+  const editBtn = taskItem.querySelector('.task-edit-btn');
+
+  const isEditing = topicEl.getAttribute('contenteditable') === 'true';
+
+  if (isEditing) {
+    const newTopic = topicEl.textContent.trim();
+    const minsText = minsEl.textContent.trim();
+
+    let newMins = 0;
+    const hMatch = minsText.match(/(\d+)h/);
+    const mMatch = minsText.match(/(\d+)m/);
+    if (hMatch) newMins += parseInt(hMatch[1]) * 60;
+    if (mMatch) newMins += parseInt(mMatch[1]);
+    if (!hMatch && !mMatch) {
+      const plain = parseInt(minsText.trim(), 10);
+      if (!isNaN(plain) && plain > 0) newMins = plain;
+    }
+
+    if (!newTopic || newMins <= 0) {
+      toast('Invalid task data', 'error');
+      return;
+    }
+
+    const task = state.tasks.find(t => t.id === taskId);
+    if (task) {
+      task.topic = newTopic;
+      task.estimated_minutes = newMins;
+      DB.save();
+      Supa.updateTask(taskId, { topic: newTopic, estimated_minutes: newMins });
+      toast('Task updated', 'success');
+    }
+
+    topicEl.setAttribute('contenteditable', 'false');
+    minsEl.setAttribute('contenteditable', 'false');
+    editBtn.classList.remove('editing');
+
+    renderPlan();
+    renderHome();
+    renderBacklog();
+  } else {
+    topicEl.setAttribute('contenteditable', 'true');
+    minsEl.setAttribute('contenteditable', 'true');
+    editBtn.classList.add('editing');
+    topicEl.focus();
+
+    minsEl.addEventListener('focus', () => {
+      const range = document.createRange();
+      range.selectNodeContents(minsEl);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }, { once: true });
+  }
+}
+
+// ─── Day Management ────────────────────────────────────────────────────
+
+export function saveDay() {
+  const label = document.getElementById('inputDayLabel').value.trim();
+  const date  = document.getElementById('inputDayDate').value;
+  if (!label) { toast('Enter a label', 'error'); return; }
+
+  const day = { id: uid(), label, date: date || null, created_at: new Date().toISOString() };
+  state.days.push(day);
+  DB.save();
+  Supa.insertDay(day);
+  closeSheet();
+  renderPlan();
+  renderHome();
+  toast('Day added', 'success');
+}
+
+export function toggleEditDay(dayId) {
+  const labelEl = document.querySelector(`[data-day-id="${dayId}"][data-field="label"]`);
+  if (!labelEl) return;
+
+  const isEditing = labelEl.getAttribute('contenteditable') === 'true';
+
+  if (isEditing) {
+    const newLabel = labelEl.textContent.trim();
+    if (!newLabel) {
+      toast('Day label cannot be empty', 'error');
+      return;
+    }
+
+    const day = state.days.find(d => d.id === dayId);
+    if (day) {
+      day.label = newLabel;
+      DB.save();
+      Supa.updateDay(dayId, { label: newLabel });
+      toast('Day label updated', 'success');
+    }
+
+    labelEl.setAttribute('contenteditable', 'false');
+    renderPlan();
+    renderHome();
+  } else {
+    const badgeEl = labelEl.querySelector('.badge');
+    if (badgeEl) badgeEl.remove();
+
+    labelEl.setAttribute('contenteditable', 'true');
+    labelEl.focus();
+
+    const range = document.createRange();
+    range.selectNodeContents(labelEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+export function deleteDay(dayId) {
+  const day = state.days.find(d => d.id === dayId);
+  if (!day) return;
+
+  const tasksToDelete = state.tasks.filter(t => t.day_id === dayId);
+  const tasksCount = tasksToDelete.length;
+
+  if (!confirm(`Delete "${day.label}" and ${tasksCount} task(s)?`)) return;
+
+  state.tasks = state.tasks.filter(t => t.day_id !== dayId);
+  state.days = state.days.filter(d => d.id !== dayId);
+
+  DB.save();
+  Promise.all(tasksToDelete.map(t => Supa.deleteTask(t.id)))
+    .then(() => Supa.deleteDay(dayId));
+
+  renderPlan();
+  renderHome();
+  renderBacklog();
+  toast('Day deleted', 'success');
+}
+
+// ─── Plan Search ───────────────────────────────────────────────────────
+
+export const handlePlanSearch = debounce(function(value) {
+  appLocals.planSearchQuery = value;
+  renderPlan();
+}, SEARCH_DEBOUNCE_MS);
+
+// ─── CSV Import ────────────────────────────────────────────────────────
+
+function setCsvStep(stepNum) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('csvStep' + i);
+    if (!el) continue;
+    el.classList.remove('active', 'done');
+    if (i < stepNum) el.classList.add('done');
+    else if (i === stepNum) el.classList.add('active');
+  }
+}
+
+export async function handleCSVImport(file) {
+  if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+    toast('Please select a valid CSV file', 'error');
+    return;
+  }
+
+  if (typeof Papa === 'undefined') {
+    toast('CSV parser not loaded — check your internet connection', 'error');
+    return;
+  }
+
+  const proc = document.getElementById('csvProcessing');
+  proc.classList.add('active');
+  document.getElementById('csvStatus').textContent = 'Reading file…';
+  setCsvStep(1);
+
+  try {
+    const text = await file.text();
+    document.getElementById('csvStatus').textContent = 'Parsing data…';
+    setCsvStep(2);
+
+    const parsed = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: h => h.trim().toLowerCase().replace(/\s+/g, '_')
+    });
+
+    if (parsed.errors.length > 0) {
+      proc.classList.remove('active');
+      toast('CSV parsing error — check file format', 'error');
+      return;
+    }
+
+    const rows = parsed.data;
+    if (rows.length === 0) {
+      proc.classList.remove('active');
+      toast('CSV file is empty', 'error');
+      return;
+    }
+
+    const requiredCols = ['day', 'subject', 'topic', 'estimated_minutes'];
+    const firstRow = rows[0];
+    const missing = requiredCols.filter(col => !(col in firstRow));
+
+    if (missing.length > 0) {
+      proc.classList.remove('active');
+      toast(`Missing columns: ${missing.join(', ')}`, 'error');
+      return;
+    }
+
+    document.getElementById('csvStatus').textContent = 'Validating rows…';
+    setCsvStep(3);
+
+    const errors = [];
+    rows.forEach((row, idx) => {
+      if (!row.day || !row.subject || !row.topic) {
+        errors.push(`Row ${idx + 2}: Missing required field`);
+      }
+      const mins = parseInt(row.estimated_minutes);
+      if (isNaN(mins) || mins <= 0) {
+        errors.push(`Row ${idx + 2}: Invalid estimated_minutes`);
+      }
+    });
+
+    if (errors.length > 0) {
+      proc.classList.remove('active');
+      const detail = errors[0] + (errors.length > 1 ? ` (+${errors.length - 1} more)` : '');
+      toast(detail, 'error');
+      console.error('CSV errors:', errors);
+      return;
+    }
+
+    document.getElementById('csvStatus').textContent = 'Preparing preview…';
+    setCsvStep(4);
+
+    const dayGroups = {};
+    rows.forEach(row => {
+      const dayKey = row.day.trim();
+      if (!dayGroups[dayKey]) dayGroups[dayKey] = [];
+      dayGroups[dayKey].push(row);
+    });
+
+    appLocals.csvParsedData = dayGroups;
+    proc.classList.remove('active');
+    showCSVSelectionUI(dayGroups);
+
+  } catch (err) {
+    console.error('CSV import error:', err);
+    proc.classList.remove('active');
+    toast('Import failed — check file format', 'error');
+  }
+}
+
+function showCSVSelectionUI(dayGroups) {
+  const dayKeys = Object.keys(dayGroups);
+  const baseDate = new Date();
+
+  appLocals.csvSelection = {};
+  dayKeys.forEach((dayKey, i) => {
+    const localDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + i);
+    const y = localDate.getFullYear();
+    const m = String(localDate.getMonth() + 1).padStart(2, '0');
+    const d = String(localDate.getDate()).padStart(2, '0');
+    appLocals.csvSelection[dayKey] = {
+      selected: true,
+      tasks: dayGroups[dayKey].map(() => true),
+      date: `${y}-${m}-${d}`
+    };
+  });
+
+  renderCSVSelectionList(dayGroups);
+  openSheet('sheetCSVImport');
+}
+
+export function updateCSVDayDate(dayIdx, value) {
+  const dayKeys = Object.keys(appLocals.csvParsedData || {});
+  const dayKey = dayKeys[dayIdx];
+  if (dayKey && appLocals.csvSelection[dayKey]) {
+    appLocals.csvSelection[dayKey].date = value;
+  }
+}
+
+export function toggleCSVDay(dayIdx) {
+  const dayKeys = Object.keys(appLocals.csvParsedData || {});
+  const dayKey = dayKeys[dayIdx];
+  if (!dayKey || !appLocals.csvSelection[dayKey]) return;
+
+  const sel = appLocals.csvSelection[dayKey];
+  sel.selected = !sel.selected;
+  sel.tasks = sel.tasks.map(() => sel.selected);
+  renderCSVSelectionList(appLocals.csvParsedData);
+}
+
+export function toggleCSVTask(dayIdx, taskIdx) {
+  const dayKeys = Object.keys(appLocals.csvParsedData || {});
+  const dayKey = dayKeys[dayIdx];
+  if (!dayKey || !appLocals.csvSelection[dayKey]) return;
+
+  const sel = appLocals.csvSelection[dayKey];
+  sel.tasks[taskIdx] = !sel.tasks[taskIdx];
+  sel.selected = sel.tasks.some(t => t);
+  renderCSVSelectionList(appLocals.csvParsedData);
+}
+
+export async function confirmCSVImport() {
+  if (!appLocals.csvParsedData) return;
+
+  const proc = document.getElementById('csvProcessing');
+  proc.classList.add('active');
+  document.getElementById('csvStatus').textContent = 'Importing study plan…';
+  setCsvStep(1);
+
+  const dayKeys = Object.keys(appLocals.csvParsedData);
+  let addedDays = 0, addedTasks = 0;
+  const totalDays = dayKeys.filter(k => appLocals.csvSelection[k] && appLocals.csvSelection[k].selected).length;
+
+  for (const dayKey of dayKeys) {
+    const sel = appLocals.csvSelection[dayKey];
+    if (!sel || !sel.selected) continue;
+
+    const dateStr = sel.date || todayStr();
+
+    const dayTasks = appLocals.csvParsedData[dayKey];
+    const selectedTasks = [];
+
+    dayTasks.forEach((row, idx) => {
+      if (sel.tasks[idx]) {
+        selectedTasks.push(row);
+      }
+    });
+
+    if (selectedTasks.length === 0) continue;
+
+    const day = {
+      id: uid(),
+      label: dayKey,
+      date: dateStr,
+      created_at: new Date().toISOString()
+    };
+
+    state.days.push(day);
+    Supa.insertDay(day).catch(e => console.warn('[Supa] day insert failed:', e));
+    addedDays++;
+
+    const stepNum = totalDays > 0 ? Math.min(4, Math.ceil((addedDays / totalDays) * 3) + 1) : 1;
+    setCsvStep(stepNum);
+    document.getElementById('csvStatus').textContent = `Adding day ${addedDays} of ${totalDays}…`;
+
+    for (const row of selectedTasks) {
+      const task = {
+        id: uid(),
+        day_id: day.id,
+        subject: row.subject.trim(),
+        topic: row.topic.trim(),
+        estimated_minutes: parseInt(row.estimated_minutes),
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      state.tasks.push(task);
+      Supa.insertTask(task).catch(e => console.warn('[Supa] task insert failed:', e));
+      addedTasks++;
+    }
+  }
+
+  DB.save();
+  appLocals.csvParsedData = null;
+  appLocals.csvSelection = {};
+  proc.classList.remove('active');
+  closeSheet();
+  renderPlan();
+  renderHome();
+  toast(`Imported ${addedDays} days, ${addedTasks} tasks`, 'success');
+}
