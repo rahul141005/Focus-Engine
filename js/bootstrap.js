@@ -165,7 +165,7 @@ async function tryFirebaseInit() {
       renderPersonal();
     }).catch(err => {
       console.error('[Firebase] sync failed:', err);
-      showCloudStatus('Database sync error — using local data', 'error');
+      showCloudStatus('Database sync error — showing last available data', 'error');
     });
   } else {
     console.warn('[BOOT] Firebase offline:', result.error);

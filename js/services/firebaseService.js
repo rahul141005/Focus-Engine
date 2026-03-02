@@ -15,9 +15,13 @@ export const Firebase = {
   async init() {
     try {
       console.log('[BOOT] Firebase init start');
-      if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId) {
-        console.error('[Firebase] FIREBASE_CONFIG is missing or invalid');
-        return { success: false, error: 'Firebase config is missing or invalid' };
+      if (!FIREBASE_CONFIG) {
+        console.error('[Firebase] FIREBASE_CONFIG is not defined');
+        return { success: false, error: 'Firebase config is not defined' };
+      }
+      if (!FIREBASE_CONFIG.projectId) {
+        console.error('[Firebase] FIREBASE_CONFIG missing required projectId field');
+        return { success: false, error: 'Firebase config missing required projectId field' };
       }
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js');
       const firestore = await import('https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js');
